@@ -370,3 +370,35 @@ describe('Karambit Skin System & Cosmic Shaders', () => {
     pass.dispose();
   });
 });
+
+describe('a chosen knife that is not unlocked yet is remembered', () => {
+  function fresh(): KarambitSkinSystem {
+    (KarambitSkinSystem as any).instance?.dispose?.();
+    (KarambitSkinSystem as any).instance = null;
+    return KarambitSkinSystem.getInstance();
+  }
+
+  it('keeps the choice instead of saving the default over it, and applies it once it unlocks', () => {
+    Object.defineProperty(globalThis, 'localStorage', { value: createLocalStorageMock(), configurable: true, writable: true });
+    localStorage.setItem('playhead.karambit.equippedSkin', 'CYBER_ARTIFACT');
+    const skins = fresh();
+    // Progress has not loaded: the default knife shows, but the choice is not lost.
+    expect(skins.getEquippedSkinId()).toBe('SIGNAL_CYAN');
+    skins.setDevPreview(false);
+    expect(localStorage.getItem('playhead.karambit.equippedSkin')).toBe('CYBER_ARTIFACT');
+
+    // Progress arrives (the knife becomes owned): the choice is applied.
+    skins.applyCloudProgression({ rewardOwnedSkinIds: ['CYBER_ARTIFACT'] } as never);
+    expect(skins.getEquippedSkinId()).toBe('CYBER_ARTIFACT');
+    expect(localStorage.getItem('playhead.karambit.equippedSkin')).toBe('CYBER_ARTIFACT');
+  });
+
+  it('forgets the pending choice when the player equips something else', () => {
+    Object.defineProperty(globalThis, 'localStorage', { value: createLocalStorageMock(), configurable: true, writable: true });
+    localStorage.setItem('playhead.karambit.equippedSkin', 'CYBER_ARTIFACT');
+    const skins = fresh();
+    expect(skins.equipSkin('SIGNAL_CYAN')).toBe(true);
+    skins.setDevPreview(false);
+    expect(localStorage.getItem('playhead.karambit.equippedSkin')).toBe('SIGNAL_CYAN');
+  });
+});
