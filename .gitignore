@@ -15,3 +15,6 @@ supabase/.temp/
 # Local measurement / scratch artifacts
 .perf/
 scratch/
+
+# Playtest scripts write screenshots to the working directory; keep them out of the repo root
+/screenshot_*.png
