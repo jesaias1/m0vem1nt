@@ -2516,7 +2516,7 @@ export class Game {
   }
 
   private restartTrack(): void {
-    if (this.friendRaceWorld && this.raceActive && !this.raceFinishReported && this.racePhase !== 'FINISHED') {
+    if (this.friendRaceWorld && this.raceActive && raceRoomService.getRoom() !== null && !this.raceFinishReported && this.racePhase !== 'FINISHED') {
       // The shared start cannot be restarted from one client: it would reset the
       // local timer and song against the opponent's. Close the menu instead.
       this.ui.raceHud.showNotice('RESTART DISABLED // ONLINE RACE');
@@ -3063,6 +3063,9 @@ export class Game {
       }
 
       if (this.stateMachine.is(GameState.PLAYING)) {
+        // Race flags without a room are left-over state: clear them before they hold
+        // the player or block a restart in an ordinary run.
+        if ((this.raceActive || this.friendRaceWorld) && raceRoomService.getRoom() === null) this.clearStaleRaceState();
         // ONLINE RACE: until GO the player is staged on the start platform and
         // the run timer does not advance, so both clients start from the same
         // authoritative zero. Physics owns every frame after GO.
@@ -4109,6 +4112,26 @@ export class Game {
     return resolveEnvironmentTheme(base)?.id ?? CITY_MAP_KEY;
   }
 
+  /**
+   * Drops every online-race flag. A race that ends WITHOUT a room to go back to
+   * (left, expired, kicked) used to leave these set, so the next solo run behaved
+   * like a race: hold-R did nothing ("restart disabled") and the start hold or the
+   * finish check could misfire.
+   */
+  private clearStaleRaceState(): void {
+    this.raceActive = false;
+    this.raceLoading = false;
+    this.raceGoArmed = false;
+    this.raceInGameReady = false;
+    this.racePhase = 'WAITING';
+    this.raceStartAtMs = null;
+    this.ui.raceHud.setCountdown(null);
+    this.ui.raceHud.setLoading(null);
+    this.ui.raceHud.hide();
+    this.clearRaceGhosts();
+    this.setFriendRaceWorld(false);
+  }
+
   private returnToRaceLobby(): void {
     this.selectedMapKey = null;
     raceRoomService.clearMapVotes();
@@ -4117,6 +4140,7 @@ export class Game {
     this.raceLoadGeneration++;
     const room = raceRoomService.getRoom();
     if (!room) {
+      this.clearStaleRaceState();
       this.ui.importScreen.racePanel.showSelect();
       return;
     }

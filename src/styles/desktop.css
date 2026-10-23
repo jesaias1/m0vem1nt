@@ -712,3 +712,11 @@ html, body { background: var(--desktop); font-family: var(--font-sans); -webkit-
 #ui-root .race-hud-ping[data-quality='ok'] { color: #ffff55; }
 #ui-root .race-hud-ping[data-quality='bad'] { color: #ff6a5c; }
 #ui-root .race-any { display: flex; align-items: center; gap: 8px; font: 13px/1.3 var(--font-sans); color: var(--ink, #ddd); cursor: pointer; }
+
+/* Very large screens: scale the windows by a WHOLE number (2x) so the pixel fonts stay crisp.
+   A fractional scale makes bitmap-style text shimmer. DialogFit keeps them on screen. */
+@media (min-width: 2300px) and (min-height: 1300px) {
+  #ui-root :is(.pause-container, .settings-container, .profile-container, .results-container, .analysis-container,
+    .armory-modal-container, .armory-modal-console, .movement-lab-song-container, .decode-container,
+    .decode-modal-dialog, .import-container.terminal-console) { zoom: 2; }
+}
