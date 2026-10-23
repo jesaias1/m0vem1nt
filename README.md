@@ -1,9 +1,42 @@
-# m0vem1nt
+<h1 align="center">m0vem1nt</h1>
+<p align="center"><b>Playhead: turn any song into a place, then run through it.</b></p>
 
-> **ENTER THE SIGNAL.**
-> *BECOME THE m0vem1nt.*
+<p align="center">
+  <a href="https://playhead-sooty.vercel.app"><b>Play it in the browser</b></a> &nbsp;|&nbsp;
+  <a href="https://www.jesaias.dk/play/playhead">Project page</a>
+</p>
 
-m0vem1nt is an experimental first-person movement game that transforms any client-side audio file into a monumental procedural 3D world. You do not simply run while music plays; **the song has become a place, and you are the playhead physically strafing through your music.**
+<p align="center">
+  <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-3178c6?style=flat-square&logo=typescript&logoColor=white">
+  <img alt="Three.js" src="https://img.shields.io/badge/Three.js-000000?style=flat-square&logo=threedotjs&logoColor=white">
+  <img alt="Web Audio" src="https://img.shields.io/badge/Web_Audio_API-39ff14?style=flat-square">
+  <img alt="Runs locally" src="https://img.shields.io/badge/audio-never_leaves_your_device-1fa3c4?style=flat-square">
+</p>
+
+![The m0vem1nt song menu: 14 built-in signals, custom audio, Movement Lab and Armory](docs/readme/menu.webp)
+
+m0vem1nt is a first-person movement game that analyses any audio file in your browser and generates a 3D course from it. You do not just run while music plays: **the song becomes a place, and you are the playhead strafing through it.** Drop in your own track or pick one of the 14 built-in signals, then bunny-hop, air-strafe and surf your way to the finish while the world lights up at exactly the moment each part of the song arrives.
+
+## Worlds
+
+<table>
+<tr>
+<td width="50%"><img src="docs/readme/harbour.webp" alt="Midnight Harbour"><br><sub><b>Midnight Harbour.</b> Docks, cranes and a ship alongside under a dusk sky.</sub></td>
+<td width="50%"><img src="docs/readme/station.webp" alt="Orbital Station"><br><sub><b>Orbital Station.</b> A service bay and docking ring above a planet.</sub></td>
+</tr>
+<tr>
+<td width="50%"><img src="docs/readme/mountains.webp" alt="Midnight Mountains"><br><sub><b>Midnight Mountains.</b> Peaks, a hamlet and an aurora over the route.</sub></td>
+<td width="50%"><img src="docs/readme/city.webp" alt="Signal City"><br><sub><b>Signal City.</b> Lit towers that resonate with the track.</sub></td>
+</tr>
+</table>
+
+## What is interesting about it
+
+- **Real audio analysis in the browser.** FFT, multi-band splitting, spectral-flux onset detection, a tempo estimator and a section detector, all client-side with the Web Audio API.
+- **A course that is guaranteed to be playable.** The generator places platforms in time and space, then a physics validator models jump arcs, speed and gravity and repairs any gap or step you could not clear.
+- **Source-engine style movement.** Fixed 120 Hz physics, air acceleration, bunny-hopping with coyote time and a jump buffer, air-strafing and surfing on steep slopes.
+- **Deterministic.** The same file always produces the same course.
+- **Private by design.** Decoding, analysis and generation run entirely on your device.
 
 ---
 
