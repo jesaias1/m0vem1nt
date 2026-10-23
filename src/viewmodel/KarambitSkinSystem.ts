@@ -1085,6 +1085,12 @@ export class KarambitSkinSystem {
 
   private trackRecords: Record<string, RunRank> = {};
   private equippedSkinId = 'SIGNAL_CYAN';
+  /**
+   * The knife the player chose that is not unlocked YET on this device (progress is
+   * still loading from the cloud, or this is a fresh browser). It is kept, saved and
+   * applied the moment it unlocks, instead of silently reverting to the default knife.
+   */
+  private pendingEquippedSkinId: string | null = null;
   private devPreviewEnabled = false;
   /**
    * EPHEMERAL replay skin override. NEVER persisted, never the equipped skin.
@@ -1604,8 +1610,9 @@ export class KarambitSkinSystem {
       this.devPreviewEnabled = devRaw === 'true';
 
       const equipped = localStorage.getItem(this.STORAGE_KEY_EQUIPPED);
-      if (equipped && KARAMBIT_SKINS.some(s => s.id === equipped) && this.isSkinUnlocked(equipped)) {
-        this.equippedSkinId = equipped;
+      if (equipped && KARAMBIT_SKINS.some(s => s.id === equipped)) {
+        if (this.isSkinUnlocked(equipped)) this.equippedSkinId = equipped;
+        else if (equipped !== this.equippedSkinId) this.pendingEquippedSkinId = equipped;
       }
     } catch (e) {
       console.warn('[KarambitSkinSystem] Failed to load equipped skin state:', e);
@@ -1617,7 +1624,8 @@ export class KarambitSkinSystem {
     if (typeof localStorage === 'undefined') return;
     try {
       localStorage.setItem(this.STORAGE_KEY_RECORDS, JSON.stringify(this.trackRecords));
-      localStorage.setItem(this.STORAGE_KEY_EQUIPPED, this.equippedSkinId);
+      // A chosen-but-still-locked knife is remembered, never overwritten by the default.
+      localStorage.setItem(this.STORAGE_KEY_EQUIPPED, this.pendingEquippedSkinId ?? this.equippedSkinId);
       localStorage.setItem(this.STORAGE_KEY_DEV, this.devPreviewEnabled ? 'true' : 'false');
       localStorage.setItem(SIGNAL_DROP_STORAGE_KEY, JSON.stringify(this.progression));
     } catch (e) {
@@ -1649,6 +1657,7 @@ export class KarambitSkinSystem {
     if (!this.isSkinUnlocked(target.id) && !this.devPreviewEnabled) {
       return false;
     }
+    this.pendingEquippedSkinId = null;
     if (target.id === this.equippedSkinId) return true;
     this.releaseActiveVideoTexture();
     this.equippedSkinId = target.id;
@@ -2279,6 +2288,15 @@ export class KarambitSkinSystem {
       }
     }
 
+    if (this.pendingEquippedSkinId && this.isSkinUnlocked(this.pendingEquippedSkinId)) {
+      // The knife the player chose before progress finished loading is available now.
+      if (!cloud.equippedSkinId || cloud.equippedSkinId === this.pendingEquippedSkinId) {
+        this.equippedSkinId = this.pendingEquippedSkinId;
+        changed = true;
+      }
+      this.pendingEquippedSkinId = null;
+    }
+
     if (changed) {
       // Cloud state may have changed the equipped skin: reconcile resident
       // cosmetic resources so a cloud equip does not leak a video or texture.
@@ -2321,6 +2339,7 @@ export class KarambitSkinSystem {
     this.progression = this.createDefaultProgression();
     this.trackRecords = {};
     this.equippedSkinId = 'SIGNAL_CYAN';
+    this.pendingEquippedSkinId = null;
     this.retainStaticTextureFor('SIGNAL_CYAN');
     this.saveState();
     this.notifyListeners();

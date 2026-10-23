@@ -15,6 +15,7 @@
 import { OnlineClient, online } from './supabaseClient';
 import { authService } from './AuthService';
 import { cloudProgression } from './CloudProgression';
+import { settingsCloudSync } from './SettingsCloudSync';
 import { RaceRoomService } from './RaceRoomService';
 
 export type OnlineSyncState =
@@ -116,6 +117,8 @@ class OnlineBootstrap {
 
     this.setStatus('SYNCING', 'reconciling progression');
     const result = await cloudProgression.sync();
+    // A registered account's saved settings come back with it (best effort).
+    void settingsCloudSync.pull();
     if (result === 'MIGRATED') {
       this.setStatus('MIGRATED', 'local progression migrated to cloud');
     } else if (result === 'SYNCED') {

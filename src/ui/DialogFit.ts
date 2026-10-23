@@ -37,17 +37,21 @@ export function fitDialog(el: HTMLElement, viewportHeight: number): number {
   // Natural height at 1x.
   el.style.zoom = '1';
   const natural = el.scrollHeight;
-  const wanted = Math.min(base, Math.max(MIN_ZOOM, available / natural));
-  if (wanted >= base - 0.001) {
-    // Fits at its own size: hand scaling back to the stylesheet (whole numbers only).
-    el.style.zoom = '';
-    if (base !== 1) el.style.maxHeight = `${available / base}px`;
-    return base;
+  // Prefer a WHOLE-number scale (pixel fonts are only crisp at 1x, 2x, ...): the
+  // largest one up to the stylesheet's that still fits the screen.
+  let whole = Math.max(1, Math.floor(base + 0.001));
+  while (whole > 1 && natural * whole > available) whole--;
+  if (natural * whole <= available) {
+    el.style.zoom = whole === base ? '' : String(whole);
+    if (whole !== 1 || base !== 1) el.style.maxHeight = `${available / whole}px`;
+    return whole;
   }
-  el.style.zoom = String(wanted);
+  // Even 1x is taller than the screen: shrink just enough (the only fractional case).
+  const zoom = Math.max(MIN_ZOOM, available / natural);
+  el.style.zoom = String(zoom);
   // The box limit is zoomed too, so counter it to keep the box at the screen height.
-  el.style.maxHeight = `${available / wanted}px`;
-  return wanted;
+  el.style.maxHeight = `${available / zoom}px`;
+  return zoom;
 }
 
 export function installDialogFit(root: HTMLElement): () => void {

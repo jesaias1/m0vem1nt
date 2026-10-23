@@ -35,6 +35,7 @@ import { PresetLevelCache } from '../audio/PresetLevelCache';
 import { onlineBootstrap } from '../online/OnlineBootstrap';
 import { online } from '../online/supabaseClient';
 import { cloudProgression } from '../online/CloudProgression';
+import { settingsCloudSync } from '../online/SettingsCloudSync';
 import {
   raceRoomService,
   RaceRoomService,
@@ -5492,6 +5493,8 @@ export class Game {
         this.refreshLocalIdentity();
         // Account isolation + safe one-time guest adoption are handled in sync().
         await cloudProgression.sync();
+        // Logging in restores the account's saved settings (or saves this device's first time).
+        await settingsCloudSync.pull();
         await this.refreshWorldRecordRewards();
         return { ok: true, detail: 'ok' };
       },
@@ -5500,6 +5503,7 @@ export class Game {
         // (so the next account cannot inherit this account's progression), then
         // start a fresh anonymous session so play stays online.
         await authService.logoutAccount();
+        settingsCloudSync.reset();
         cloudProgression.signOutLocalState();
         this.refreshLocalIdentity();
         await authService.ensureSession();
