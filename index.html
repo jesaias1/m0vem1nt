@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>m0vem1nt</title>
   <meta name="description" content="Your music, as a place. Drop in a song and explore the world it becomes. m0vem1nt is a free music-driven movement game in your browser." />
+  <link rel="canonical" href="https://movemint.pro/" />
+  <meta name="theme-color" content="#05070c" />
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="m0vem1nt" />
   <meta property="og:title" content="m0vem1nt — Your music, as a place." />
@@ -25,6 +27,35 @@
   <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
 </head>
 <body>
+  <div id="mobile-notice" role="alert" hidden>
+    <div class="mobile-notice-card">
+      <img src="/favicon.png" alt="" width="96" height="96" />
+      <h1>m0vem1nt</h1>
+      <p>This game needs a keyboard and a mouse.<br />Open it on a computer to play.</p>
+      <button type="button" id="mobile-notice-dismiss">Look around anyway</button>
+    </div>
+  </div>
+  <style>
+    #mobile-notice { position: fixed; inset: 0; z-index: 99999; display: none; align-items: center; justify-content: center; background: #05070c; color: #fff; font-family: system-ui, sans-serif; text-align: center; padding: 24px; }
+    #mobile-notice .mobile-notice-card { max-width: 340px; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+    #mobile-notice h1 { margin: 0; font-size: 28px; letter-spacing: 0.08em; }
+    #mobile-notice p { margin: 0; line-height: 1.5; color: #c0c8d0; }
+    #mobile-notice button { margin-top: 8px; padding: 10px 18px; background: #00f0ff; color: #05070c; border: 0; font-weight: 700; }
+    @media (pointer: coarse) and (max-width: 900px) { #mobile-notice:not([hidden]) { display: flex; } }
+  </style>
+  <script>
+    (function () {
+      var box = document.getElementById('mobile-notice');
+      var dismissed = false;
+      try { dismissed = sessionStorage.getItem('m0vem1nt.mobileNoticeDismissed') === '1'; } catch (e) {}
+      if (box && !dismissed) box.hidden = false;
+      var btn = document.getElementById('mobile-notice-dismiss');
+      if (btn) btn.addEventListener('click', function () {
+        box.hidden = true;
+        try { sessionStorage.setItem('m0vem1nt.mobileNoticeDismissed', '1'); } catch (e) {}
+      });
+    })();
+  </script>
   <div id="canvas-container"></div>
   <div id="ui-root"></div>
   <script type="module" src="/src/main.ts"></script>

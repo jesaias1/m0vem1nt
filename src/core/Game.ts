@@ -2058,6 +2058,7 @@ export class Game {
     // timestamp before this runs. Nothing in this presentation sequence writes
     // runElapsedTime, so completion time is unchanged.
     this.isFinished = true;
+    this.maybeSuggestSignIn();
     this.playerController.resetKeys();
 
     // Friend race: report the finish crossing to the shared race authority.
@@ -3727,6 +3728,18 @@ export class Game {
   private restoringRace = false;
   private droppedRacers = new Set<string>();
   private soloWinNoticeShown = false;
+
+  /** After a first finished run, once per device, tell guests that logging in saves their knife and settings. */
+  private maybeSuggestSignIn(): void {
+    try {
+      if (authService.isRegisteredAccount()) return;
+      if (localStorage.getItem('m0vem1nt.signinTip.v1')) return;
+      localStorage.setItem('m0vem1nt.signinTip.v1', '1');
+      this.ui.importScreen.setOnlineStatus('TIP', 'SIGN IN (BOTTOM RIGHT) TO SAVE YOUR KNIFE, SETTINGS AND PROGRESS');
+    } catch {
+      /* private mode: no tip */
+    }
+  }
 
   private bonusClaiming = false;
 
