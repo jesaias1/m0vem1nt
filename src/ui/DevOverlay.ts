@@ -184,31 +184,13 @@ export class DevOverlay {
       setTimeout(() => { clearBtn.textContent = '[ CLEAR SIGNALS ]'; }, 1500);
     });
 
-    // Expose console helpers
-    (window as any).grantDevSignals = (count = 999) => {
-      KarambitSkinSystem.getInstance().grantDevPendingSignals(count);
-      console.log(`[DEV] Granted ${count} pending signals`);
-    };
-    (window as any).clearDevSignals = () => {
-      KarambitSkinSystem.getInstance().clearDevPendingSignals();
-      console.log('[DEV] Cleared all pending signals');
-    };
 
     document.body.appendChild(this.element);
 
-    // Check query param
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('debug') === '1') {
-      this.show();
-    }
 
-    // Toggle with F3 key; 1/2/3/4 isolate audio-visual channels (DEV only).
+    // The overlay has no player-facing way to open it any more (F3 and ?debug=1 are
+    // gone); 1/2/3/4 isolate audio-visual channels only while it is visible.
     window.addEventListener('keydown', (e) => {
-      if (e.code === 'F3') {
-        e.preventDefault();
-        this.toggle();
-        return;
-      }
       if (!this.isVisible) return;
       const mode =
         e.code === 'Digit1' ? 'BASS' :

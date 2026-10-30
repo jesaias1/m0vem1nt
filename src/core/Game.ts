@@ -36,6 +36,7 @@ import { onlineBootstrap } from '../online/OnlineBootstrap';
 import { online } from '../online/supabaseClient';
 import { cloudProgression } from '../online/CloudProgression';
 import { settingsCloudSync } from '../online/SettingsCloudSync';
+import { claimBonusSignalDrops } from '../online/BonusDrops';
 import {
   raceRoomService,
   RaceRoomService,
@@ -2835,6 +2836,16 @@ export class Game {
       // After an Escape resume the mouse may not be captured yet (see
       // resumeFromEscape): the first ordinary key press captures it.
       if (this.relockOnNextInput && e.code !== 'Escape') this.tryRelockAfterEscape();
+      // SHIFT+M: the one-time bonus of 20 signal drops (menus only, never mid-run or while typing).
+      if (e.code === 'KeyM' && e.shiftKey && !e.repeat && !this.stateMachine.is(GameState.PLAYING) && !this.stateMachine.is(GameState.MOVEMENT_LAB)) {
+        const t = e.target as HTMLElement | null;
+        const typing = !!t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable);
+        if (!typing) {
+          e.preventDefault();
+          void this.claimBonusDrops();
+          return;
+        }
+      }
       // In-game race READY consumes SPACE only while the race is staged.
       if (this.handleRaceReadyKey(e)) return;
       // FINISH spectator NEXT / PREV consumes the arrow keys only after we
@@ -3716,6 +3727,29 @@ export class Game {
   private restoringRace = false;
   private droppedRacers = new Set<string>();
   private soloWinNoticeShown = false;
+
+  private bonusClaiming = false;
+
+  /** Shift+M: asks the server for the one-time 20-drop bonus and refreshes the account's drops. */
+  private async claimBonusDrops(): Promise<void> {
+    if (this.bonusClaiming) return;
+    this.bonusClaiming = true;
+    const status = (text: string): void => this.ui.importScreen.setOnlineStatus('BONUS', text);
+    try {
+      status('CLAIMING...');
+      const result = await claimBonusSignalDrops();
+      if (!result.ok) {
+        status(result.detail);
+      } else if (result.granted > 0) {
+        await cloudProgression.sync();
+        status(`+${result.granted} SIGNAL DROPS // OPEN THEM IN THE ARMORY`);
+      } else {
+        status('BONUS ALREADY CLAIMED');
+      }
+    } finally {
+      this.bonusClaiming = false;
+    }
+  }
 
   private async consumePendingInvite(): Promise<void> {
     const code = this.pendingInviteCode;
