@@ -54,7 +54,7 @@ import { validateDisplayName } from '../online/AuthService';
 import { computeMapIdentity } from '../online/MapIdentity';
 import type { MapIdentity } from '../online/MapIdentity';
 import { OFFICIAL_MAP_REGISTRY } from '../online/OfficialMapRegistry';
-import { computeSurfMapIdentity } from '../online/SurfMapIdentity';
+import { computeSurfMapIdentity, parseSurfBoardTrackId } from '../online/SurfMapIdentity';
 import {
   RemoteRacerGhosts,
   GUEST_SIGNAL_COLOR,
@@ -509,8 +509,7 @@ export class Game {
       () => this.enterMovementLab(undefined, { academy: true }),
       async (track) => {
         const mode = readMenuPreferences().mode;
-        await this.handleCatalogTrackSelected(track);
-        if (mode === 'SURF' && this.stateMachine.is(GameState.READY)) await this.switchReadyToSurf();
+        await this.handleCatalogTrackSelected(track, null, mode === 'SURF' ? 'SURF' : DEFAULT_COURSE_TYPE);
       },
       (trackId) => {
         // RACE PB GHOST: retrieve + validate + enter the level. Failures surface
@@ -622,7 +621,8 @@ export class Game {
         // menu round-trip, no forcing a lock, deterministic catalog order.
         const entry = MusicPack.getTrackById(trackId);
         if (!entry || this.friendRaceWorld) return { ok: false, detail: 'NEXT SIGNAL UNAVAILABLE' };
-        await this.handleCatalogTrackSelected(entry);
+        const nextMode: CourseType = this.currentCourseType === 'SURF' ? 'SURF' : DEFAULT_COURSE_TYPE;
+        await this.handleCatalogTrackSelected(entry, null, nextMode);
         if (!this.stateMachine.is(GameState.READY)) return { ok: false, detail: 'SIGNAL LOAD FAILED // RETRY' };
         this.stateMachine.transitionTo(GameState.COUNTDOWN);
         return { ok: true, detail: 'SIGNAL READY' };
@@ -648,7 +648,8 @@ export class Game {
         this.returnToImport();
         this.ui.importScreen.openLeaderboardTab();
       },
-      onRaceGhost: (runId) => this.raceLeaderboardGhostAndPlay(runId)
+      onRaceGhost: (runId) => this.raceLeaderboardGhostAndPlay(runId),
+      onSignIn: () => this.openAccountModal()
     });
 
     // Player fall / restore / full restart
@@ -682,6 +683,12 @@ export class Game {
         this.viewmodelController.triggerMovementAccent('SURF_LOCK', quality);
         this.world.pulseSignal(0.32 * quality);
         this.ui.hud.showToast('SIGNAL LOCK // CLEAN SURF', 1200);
+      },
+      surfTransfer: (speedUnits) => {
+        this.movementSfx.playSurfLock(0.85);
+        this.viewmodelController.triggerMovementAccent('SURF_LOCK', 0.85);
+        this.world.pulseSignal(0.28);
+        this.ui.hud.showToast(`AIR TRANSFER // ${Math.round(speedUnits)} U/S`, 1100);
       },
       finish: () => {
         this.movementSfx.playFinishImpact();
@@ -782,8 +789,7 @@ export class Game {
     if (!entry) return;
     // Re-select the same trusted catalog track: the canonical load path rebuilds
     // the world and lands back on WORLD READY (analysing -> ready).
-    await this.handleCatalogTrackSelected(entry);
-    if (wasSurf && this.stateMachine.is(GameState.READY)) await this.switchReadyToSurf();
+    await this.handleCatalogTrackSelected(entry, null, wasSurf ? 'SURF' : DEFAULT_COURSE_TYPE);
   }
 
   private async enterMovementLab(trackId?: string, opts?: { academy?: boolean }): Promise<void> {
@@ -839,6 +845,10 @@ export class Game {
             this.movementLab = null;
           }
           this.ui.importScreen.show();
+          if (this.pendingSignInTip && !authService.isRegisteredAccount()) {
+            this.pendingSignInTip = false;
+            this.ui.importScreen.setOnlineStatus('TIP', 'SIGN IN (BOTTOM RIGHT) TO SAVE YOUR KNIFE, SETTINGS AND PROGRESS');
+          }
           break;
 
         case GameState.MOVEMENT_LAB:
@@ -994,6 +1004,7 @@ export class Game {
             const overtimeDuration = Math.max(0, this.runElapsedTime - (this.currentAnalysis.duration || 0));
 
             // Check and save personal best ghost (ONLY for ranked runs, NEVER overtime)
+            const priorGhostPbTime = this.ghostManager.getPBTime();
             let isNewPB = false;
             if (this.replayRecorder.hasData() && !isOvertime) {
               isNewPB = this.ghostManager.saveIfPersonalBest(
@@ -1098,6 +1109,7 @@ export class Game {
               // NORMAL board; the run never touches NORMAL progression, drops or
               // prestige (currentOfficialTrackId is null above). surfInfo drives
               // the SURF badge on the report and the board submission below.
+              priorPbTime = priorGhostPbTime;
               const surfIdentity = this.surfMapIdentity();
               if (surfIdentity) {
                 surfInfo = {
@@ -1177,7 +1189,13 @@ export class Game {
                 pbGhostLabel: pbGhost.label
               },
               surfInfo
-                ? { isSurf: true, boardTrackId: surfInfo.boardTrackId, title: surfInfo.title }
+                ? {
+                    isSurf: true,
+                    boardTrackId: surfInfo.boardTrackId,
+                    title: surfInfo.title,
+                    officialTrackId: surfInfo.officialTrackId,
+                    pbTime: this.ghostManager.getPBTime()
+                  }
                 : undefined
             );
             this.ui.resultsScreen.setRaceWaiting(this.friendRaceWorld);
@@ -1275,6 +1293,29 @@ export class Game {
    * never regenerates the level or disturbs an in-progress run.
    */
   private async prepareCanonicalPlayback(trackId: string): Promise<boolean> {
+    const parsedSurf = parseSurfBoardTrackId(trackId);
+    if (parsedSurf) {
+      if (
+        !this.stateMachine.is(GameState.IMPORT) &&
+        this.currentCourseType === 'SURF' &&
+        this.currentSurfOfficialTrackId === parsedSurf.officialTrackId &&
+        this.currentTrackCanonical &&
+        this.currentMapIdentity()?.trackId === trackId
+      ) {
+        return true;
+      }
+      const surfEntry = MusicPack.getTrackById(parsedSurf.officialTrackId);
+      if (!surfEntry) return false;
+      await this.handleCatalogTrackSelected(surfEntry, null, 'SURF');
+      return (
+        this.stateMachine.is(GameState.READY) &&
+        this.currentCourseType === 'SURF' &&
+        this.currentSurfOfficialTrackId === surfEntry.id &&
+        this.currentTrackCanonical &&
+        this.currentMapIdentity() !== null
+      );
+    }
+
     if (
       !this.stateMachine.is(GameState.IMPORT) &&
       this.currentOfficialTrackId === trackId &&
@@ -1299,16 +1340,17 @@ export class Game {
     );
   }
 
-  public async loadPresetTrack(trackId: string): Promise<void> {
+  public async loadPresetTrack(trackId: string, courseType: CourseType = DEFAULT_COURSE_TYPE): Promise<void> {
     const entry = MusicPack.getTrackById(trackId);
     if (entry) {
-      await this.handleCatalogTrackSelected(entry);
+      await this.handleCatalogTrackSelected(entry, null, courseType);
     }
   }
 
   private async handleCatalogTrackSelected(
     trackEntry: TrackCatalogEntry,
-    ghostRun: GhostRaceRun | null = null
+    ghostRun: GhostRaceRun | null = null,
+    courseType: CourseType = DEFAULT_COURSE_TYPE
   ): Promise<void> {
     // A plain track entry clears any armed ghost. Only an explicit ghost-race
     // entry arms one.
@@ -1318,15 +1360,14 @@ export class Game {
     // Any track change (retry, next signal, custom audio, menu selection)
     // supersedes a result-board fetch still in flight.
     this.invalidateResultCompetition();
+    const isSurfMode = normalizeCourseType(courseType) === 'SURF';
     try {
-      this.currentOfficialTrackId = trackEntry.id;
-      this.currentSurfOfficialTrackId = null;
+      this.currentOfficialTrackId = isSurfMode ? null : trackEntry.id;
+      this.currentSurfOfficialTrackId = isSurfMode ? trackEntry.id : null;
       this.currentCustomAudioBuffer = null;
-      // Official Signal Pack courses are PLAYHEAD; a surf selection can never leak
-      // its identity into an official run.
-      this.currentCourseType = DEFAULT_COURSE_TYPE;
-      this.ui.analysisScreen.setCourseVariant(false);
-      this.isFirstContactCourse = !!trackEntry.isFirstContact;
+      this.currentCourseType = isSurfMode ? 'SURF' : DEFAULT_COURSE_TYPE;
+      this.ui.analysisScreen.setCourseVariant(isSurfMode, true);
+      this.isFirstContactCourse = !isSurfMode && !!trackEntry.isFirstContact;
       this.stateMachine.transitionTo(GameState.ANALYSING);
       this.ui.analysisScreen.setTrackTitle(trackEntry.title);
       this.ui.analysisScreen.setStage(`[SIGNAL] OFFICIAL PROGRAM REQUESTED // ${trackEntry.genre}`, 0.04);
@@ -1342,27 +1383,35 @@ export class Game {
         this.ui.analysisScreen.setStage('[AUDIO] PROGRAM BUFFER READY', 0.35);
         await this.audioEngine.init();
         this.audioEngine.setBuffer(buffer);
+        if (isSurfMode) this.currentCustomAudioBuffer = buffer;
 
         this.currentAnalysis = precomputed.analysis;
         this.ui.applyAccent(precomputed.analysis.visualAccent);
         this.environment.setAccent(precomputed.analysis.visualAccent);
 
-        this.ui.analysisScreen.setStage('[MAP] PRECOMPUTED MOVEMENT PHRASES RESTORED', 0.72);
-        this.currentTrack = precomputed.track;
+        this.ui.analysisScreen.setStage(
+          isSurfMode ? '[MAP] SURF PHRASES' : '[MAP] PRECOMPUTED MOVEMENT PHRASES RESTORED',
+          0.72
+        );
+        const resolvedTrack = isSurfMode
+          ? TrackGenerator.generate(precomputed.analysis, 'SURF')
+          : precomputed.track;
+        this.currentTrack = resolvedTrack;
         this.currentAnalysis = precomputed.analysis;
         this.ui.analysisScreen.setStage('[WORLD] SYNTHESIZING SPACE', 0.88);
         // Let the stage text and progress bar actually paint before the world
         // build blocks the thread, so loading advances visibly instead of
         // jumping from one frozen frame to the next.
         await this.nextPaint();
-        if (this.currentOfficialTrackId !== trackEntry.id || !this.stateMachine.is(GameState.ANALYSING)) return;
+        const activeOfficialId = isSurfMode ? this.currentSurfOfficialTrackId : this.currentOfficialTrackId;
+        if (activeOfficialId !== trackEntry.id || !this.stateMachine.is(GameState.ANALYSING)) return;
         // The catalog id here is TRUSTED (arrived from a real official track
         // selection), so the world can resolve the correct official profile.
         this.world.loadTrack(
           precomputed.analysis,
-          precomputed.track,
+          resolvedTrack,
           this.environment,
-          trackEntry.id,
+          isSurfMode ? null : trackEntry.id,
           this.selectedMapKey ?? trackEntry.id
         );
         this.syncMapPicker();
@@ -1378,9 +1427,12 @@ export class Game {
         // the READY screen nor the first second of the run hitches on them.
         await this.nextPaint();
         await this.environment.prewarmShadersAsync();
-        if (this.currentOfficialTrackId !== trackEntry.id || !this.stateMachine.is(GameState.ANALYSING)) return;
+        const postOfficialId = isSurfMode ? this.currentSurfOfficialTrackId : this.currentOfficialTrackId;
+        if (postOfficialId !== trackEntry.id || !this.stateMachine.is(GameState.ANALYSING)) return;
         this.ui.analysisScreen.displayAnalysis(precomputed.analysis);
-        this.currentTrackCanonical = true;
+        this.currentTrackCanonical = isSurfMode
+          ? Math.abs(precomputed.analysis.duration - buffer.duration) <= 0.5
+          : true;
         // The selected track is now current: refresh the restrained PB-ghost
         // action so it reflects whether a usable recorded replay exists.
         this.refreshPbGhostAvailability(trackEntry.id);
@@ -1562,11 +1614,13 @@ export class Game {
 
     let analysis = fallbackAnalysis;
     let canonical = false;
+    let presetEvents: typeof this.world.songDirector.spectaclePlanner.events | undefined;
     if (this.currentSurfOfficialTrackId) {
       const preset = await PresetLevelCache.loadPreset(this.currentSurfOfficialTrackId);
       if (preset && Math.abs(preset.analysis.duration - buffer.duration) <= 0.5) {
         analysis = preset.analysis;
         canonical = true;
+        presetEvents = preset.spectacleEvents;
       }
     }
     this.currentAnalysis = analysis;
@@ -1577,14 +1631,20 @@ export class Game {
     this.currentTrack = track;
     this.currentTrackCanonical = canonical;
     this.ui.analysisScreen.setStage('[WORLD] SYNTHESIZING SPACE', 0.94);
+    await this.nextPaint();
     // The surf world keeps a null official id; the preserved song id only
     // selects the visual environment, so both variants of a song share it.
     this.world.loadTrack(analysis, track, this.environment, null, this.selectedMapKey ?? this.currentSurfOfficialTrackId);
     this.syncMapPicker();
+    if (presetEvents) {
+      this.world.songDirector.spectaclePlanner.events = presetEvents;
+    }
     this.world.songDirector.onSectionAnnouncement = (title) => {
       this.ui.hud.showSectionTitle(title);
     };
     this.ui.analysisScreen.setStage('[ROUTE] COURSE ONLINE', 0.98);
+    await this.nextPaint();
+    await this.environment.prewarmShadersAsync();
     this.stateMachine.transitionTo(GameState.READY);
   }
 
@@ -3276,6 +3336,12 @@ export class Game {
         this.world.visualController.state.sectionTheme,
         this.world.visualController.state.sectionIndex + 1
       );
+      this.ui.hud.updateSurfTelemetry(
+        this.currentCourseType === 'SURF',
+        this.playerController.isSurfing || this.playerController.surfState.isSurfing,
+        this.playerController.surfState.surfSide,
+        this.playerController.getSpeedUnits()
+      );
 
       // Onboarding Guidance for FIRST CONTACT
       if (this.isFirstContactCourse) {
@@ -3599,10 +3665,7 @@ export class Game {
       onSelectBoard: (trackId, board) => void this.refreshLeaderboard(trackId, board),
       onPlaySignal: (trackId) => {
         const board = leaderboardPanel.getBoardKind();
-        void this.loadPresetTrack(trackId).then(() => {
-          if (board === 'SURF') return this.switchReadyToSurf();
-          return undefined;
-        });
+        void this.loadPresetTrack(trackId, board === 'SURF' ? 'SURF' : DEFAULT_COURSE_TYPE);
       },
       onWatchRun: (runId) => void this.watchLeaderboardRun(runId),
       onRaceRun: (runId) => {
@@ -3729,12 +3792,15 @@ export class Game {
   private droppedRacers = new Set<string>();
   private soloWinNoticeShown = false;
 
+  private pendingSignInTip = false;
+
   /** After a first finished run, once per device, tell guests that logging in saves their knife and settings. */
   private maybeSuggestSignIn(): void {
     try {
       if (authService.isRegisteredAccount()) return;
       if (localStorage.getItem('m0vem1nt.signinTip.v1')) return;
       localStorage.setItem('m0vem1nt.signinTip.v1', '1');
+      this.pendingSignInTip = true;
       this.ui.importScreen.setOnlineStatus('TIP', 'SIGN IN (BOTTOM RIGHT) TO SAVE YOUR KNIFE, SETTINGS AND PROGRESS');
     } catch {
       /* private mode: no tip */
@@ -3755,6 +3821,7 @@ export class Game {
         status(result.detail);
       } else if (result.granted > 0) {
         await cloudProgression.sync();
+        this.ui.importScreen.renderArmory();
         status(`+${result.granted} SIGNAL DROPS // OPEN THEM IN THE ARMORY`);
       } else {
         status('BONUS ALREADY CLAIMED');
@@ -5146,8 +5213,19 @@ export class Game {
 
   /** Canonical identity of the currently loaded map, or null if not official. */
   public currentMapIdentity(): PovReplayIdentity | null {
-    if (!this.currentTrack || !this.currentAnalysis || !this.currentOfficialTrackId) return null;
+    if (!this.currentTrack || !this.currentAnalysis) return null;
     if (!this.currentTrackCanonical) return null;
+    if (!this.currentOfficialTrackId) {
+      const surf = this.surfMapIdentity();
+      if (!surf) return null;
+      return {
+        trackId: surf.trackId,
+        mapVersion: surf.mapVersion,
+        mapFingerprint: surf.mapFingerprint,
+        movementVersion: surf.movementVersion,
+        courseType: 'SURF'
+      };
+    }
     const identity = computeMapIdentity(
       this.currentOfficialTrackId,
       this.currentTrack,
@@ -5397,15 +5475,8 @@ export class Game {
     const trackId = entry?.trackId ?? this.ui.importScreen.leaderboardPanel.getSelectedTrack();
     const finishTimeUs = entry?.timeUs;
 
-    const level = await PresetLevelCache.loadPreset(trackId);
-    if (!level) return { ok: false, detail: 'CANONICAL MAP UNAVAILABLE' };
-    const identity = computeMapIdentity(trackId, level.track, level.analysis);
-    const expected: PovReplayIdentity = {
-      trackId,
-      mapVersion: identity.mapVersion,
-      mapFingerprint: identity.mapFingerprint,
-      movementVersion: identity.movementVersion
-    };
+    const expected = await this.canonicalIdentityFor(trackId);
+    if (!expected) return { ok: false, detail: 'CANONICAL MAP UNAVAILABLE' };
 
     // Local replay first (own run, instant and offline-capable).
     const localPayload = finishTimeUs ? replayStorageService.getLocal(trackId, finishTimeUs) : null;
@@ -5475,6 +5546,20 @@ export class Game {
 
   /** Canonical identity of a track as shipped, or null when unavailable. */
   private async canonicalIdentityFor(trackId: string): Promise<PovReplayIdentity | null> {
+    const parsedSurf = parseSurfBoardTrackId(trackId);
+    if (parsedSurf) {
+      const level = await PresetLevelCache.loadPreset(parsedSurf.officialTrackId);
+      if (!level) return null;
+      const surfTrack = TrackGenerator.generate(level.analysis, 'SURF');
+      const identity = computeSurfMapIdentity(parsedSurf.officialTrackId, surfTrack, level.analysis);
+      return {
+        trackId: identity.trackId,
+        mapVersion: identity.mapVersion,
+        mapFingerprint: identity.mapFingerprint,
+        movementVersion: identity.movementVersion,
+        courseType: 'SURF'
+      };
+    }
     const level = await PresetLevelCache.loadPreset(trackId);
     if (!level) return null;
     const identity = computeMapIdentity(trackId, level.track, level.analysis);
@@ -5749,8 +5834,10 @@ export class Game {
     const entry = panel.getEntryByRunId(runId);
     const trackId = entry?.trackId ?? panel.getSelectedTrack();
     const finishTimeUs = entry?.timeUs;
+    const parsedSurf = parseSurfBoardTrackId(trackId);
+    const baseTrackId = parsedSurf ? parsedSurf.officialTrackId : trackId;
 
-    const catalogEntry = this.ui.importScreen.getCatalogEntry(trackId);
+    const catalogEntry = this.ui.importScreen.getCatalogEntry(baseTrackId);
     if (!catalogEntry) return { ok: false, detail: 'TRACK NOT FOUND' };
 
     const expected = await this.canonicalIdentityFor(trackId);
@@ -5778,7 +5865,7 @@ export class Game {
     });
     if (!built.ok) return { ok: false, detail: Game.ghostRejectionDetail(built.reason) };
 
-    await this.handleCatalogTrackSelected(catalogEntry, built.run);
+    await this.handleCatalogTrackSelected(catalogEntry, built.run, parsedSurf ? 'SURF' : DEFAULT_COURSE_TYPE);
     return { ok: true, detail: 'GHOST // VERIFIED' };
   }
 
@@ -5869,7 +5956,8 @@ export class Game {
     // The replay is only meaningful against its canonical map. Require the
     // shipped preset, then run the SAME canonical preparation the game uses for
     // a WATCH/ghost load (baked audio buffer + frozen world/route).
-    const level = await PresetLevelCache.loadPreset(trackId);
+    const baseTrackId = parseSurfBoardTrackId(trackId)?.officialTrackId ?? trackId;
+    const level = await PresetLevelCache.loadPreset(baseTrackId);
     if (!level) return { ok: false, detail: 'CANONICAL MAP UNAVAILABLE' };
 
     const prepared = await this.prepareCanonicalPlayback(trackId);

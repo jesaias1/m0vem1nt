@@ -17,4 +17,9 @@ describe('cloud settings validation', () => {
   it('copes with junk input', () => {
     for (const junk of [null, undefined, 5, 'x', [], [1, 2]]) expect(sanitizeCloudSettings(junk, template)).toEqual({});
   });
+
+  it('clamps out-of-range numeric settings and rejects invalid enum strings', () => {
+    const res = sanitizeCloudSettings({ fov: -500, masterVolume: 99, graphics: 'BOGUS_TIER' }, template);
+    expect(res).toEqual({ fov: 60, masterVolume: 1 });
+  });
 });

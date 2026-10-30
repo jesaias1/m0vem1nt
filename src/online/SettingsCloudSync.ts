@@ -18,15 +18,45 @@ import { online } from './supabaseClient';
 
 const PUSH_DEBOUNCE_MS = 1500;
 
-/** Keeps only keys the game knows, with the same type, finite numbers and short strings. */
+const NUMERIC_BOUNDS: Record<string, readonly [number, number]> = {
+  mouseSensitivity: [0.05, 10],
+  fov: [60, 130],
+  masterVolume: [0, 1],
+  viewmodelFov: [50, 110],
+  viewmodelSway: [0, 2],
+  spinSpeed: [0.25, 3]
+};
+
+const ENUM_ALLOWED: Record<string, readonly string[]> = {
+  visualQuality: ['SIGNAL', 'CLEAN', 'HIGH', 'PERFORMANCE'],
+  graphics: ['AUTO', 'LOW', 'MEDIUM', 'HIGH', 'ULTRA'],
+  effectIntensity: ['LOW', 'STANDARD', 'HIGH'],
+  ghostMode: ['ALL', 'PB_ONLY', 'RIVAL_ONLY', 'OFF'],
+  viewmodelMode: ['FULL', 'MINIMAL', 'OFF'],
+  viewmodelAccent: ['ADAPTIVE', 'DEFAULT_CYAN', 'OFF'],
+  terminalCallouts: ['FULL', 'MINIMAL', 'OFF']
+};
+
+/** Keeps only keys the game knows, with the same type, clamped numbers and valid enum strings. */
 export function sanitizeCloudSettings(raw: unknown, template: Record<string, unknown>): Record<string, unknown> {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
   const out: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
     if (!Object.prototype.hasOwnProperty.call(template, key)) continue;
     if (typeof value !== typeof template[key]) continue;
-    if (typeof value === 'number' && !Number.isFinite(value)) continue;
-    if (typeof value === 'string' && value.length > 40) continue;
+    if (typeof value === 'number') {
+      if (!Number.isFinite(value)) continue;
+      const bounds = NUMERIC_BOUNDS[key];
+      out[key] = bounds ? Math.min(bounds[1], Math.max(bounds[0], value)) : value;
+      continue;
+    }
+    if (typeof value === 'string') {
+      if (value.length > 40) continue;
+      const allowed = ENUM_ALLOWED[key];
+      if (allowed && !allowed.includes(value)) continue;
+      out[key] = value;
+      continue;
+    }
     out[key] = value;
   }
   return out;

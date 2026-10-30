@@ -34,6 +34,7 @@ export interface MovementFeedbackSinks {
   nearMiss(intensity: number, side: number, obstacleId: number): void;
   landing(intensity: number, major: boolean): void;
   surfLock(quality: number): void;
+  surfTransfer?(speedUnits: number, airtime: number): void;
   finish(): void;
 }
 
@@ -163,11 +164,6 @@ export class MovementFeedbackController {
         this.setLastEvent(result.major ? 'MAJOR TRANSFER' : 'LANDING');
       }
     }
-    if (player.isGrounded || player.isSurfing) {
-      this.airtime = 0;
-      this.airPeakY = player.position.y;
-    }
-
     // --- Surf enter / exit ----------------------------------------------
     if (player.isSurfing) {
       this.lastSurfSpeedUnits = speedUnits;
@@ -178,7 +174,16 @@ export class MovementFeedbackController {
         1,
         player.surfState.entrySpeed * player.config.speedUnitScale
       );
-      this.setLastEvent('SURF ENTER');
+      if (this.airtime >= 0.22 && speedUnits >= 360) {
+        this.sinks.surfTransfer?.(speedUnits, this.airtime);
+        this.setLastEvent('SURF TRANSFER');
+      } else {
+        this.setLastEvent('SURF ENTER');
+      }
+    }
+    if (player.isGrounded || player.isSurfing) {
+      this.airtime = 0;
+      this.airPeakY = player.position.y;
     }
     if (this.prevSurfing && !player.isSurfing) {
       const result = classifySurfExit({

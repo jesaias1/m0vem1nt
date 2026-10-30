@@ -41,7 +41,7 @@ export class LeaderboardPanel {
 
   private selectElem: HTMLSelectElement;
   private boardElem: HTMLElement;
-  private boardKind: LeaderboardBoardKind = 'NORMAL';
+  private boardKind: LeaderboardBoardKind = 'SURF';
   /** Entries of the currently rendered board, so WATCH can resolve a run id. */
   private currentEntries: LeaderboardView['entries'] = [];
   private statusElem: HTMLElement;
@@ -89,11 +89,11 @@ export class LeaderboardPanel {
       <div class="leaderboard-head">
         <label class="online-label" for="lb-track-select">SIGNAL</label>
         <select class="online-select" id="lb-track-select"></select>
-        <button class="terminal-btn-subtle" id="lb-play" type="button">> PLAY SIGNAL</button>
+        <button class="terminal-btn-subtle" id="lb-play" type="button">> PLAY SURF</button>
       </div>
       <div class="leaderboard-board-tabs" id="lb-board-tabs" role="tablist" aria-label="Board type">
-        <button class="lb-board-tab active" id="lb-board-normal" role="tab" aria-selected="true" type="button" data-board="NORMAL">PLATFORMS</button>
-        <button class="lb-board-tab" id="lb-board-surf" role="tab" aria-selected="false" tabindex="-1" type="button" data-board="SURF">SURF</button>
+        <button class="lb-board-tab active" id="lb-board-surf" role="tab" aria-selected="true" type="button" data-board="SURF">SURF</button>
+        <button class="lb-board-tab" id="lb-board-normal" role="tab" aria-selected="false" tabindex="-1" type="button" data-board="NORMAL">PLATFORMS</button>
       </div>
 
       <div class="online-lb-status" id="lb-status" role="status">SELECT A SIGNAL</div>

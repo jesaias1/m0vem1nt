@@ -383,8 +383,14 @@ export class ImportScreen {
                 </div>
               </div>
 
+              <div class="custom-course-type showcase-course-type" id="showcase-course-type" role="radiogroup" aria-label="Game mode">
+                <span class="course-type-label">MODE</span>
+                <button type="button" class="course-type-btn active" id="btn-showcase-mode-surf" role="radio" aria-checked="true" data-course-type="SURF">SURF<span>BASE MODE · FLOW / TRANSFERS</span></button>
+                <button type="button" class="course-type-btn" id="btn-showcase-mode-playhead" role="radio" aria-checked="false" data-course-type="PLAYHEAD">PLATFORMS<span>EXTRA MODE · MIXED MOVEMENT</span></button>
+              </div>
+
               <div class="showcase-actions">
-                <button class="btn-hero btn-terminal-exec" id="btn-showcase-enter"><span class="exec-glyph">&gt;</span> EXEC TRACK</button>
+                <button class="btn-hero btn-terminal-exec" id="btn-showcase-enter"><span class="exec-glyph">&gt;</span> EXEC SURF</button>
                 <div class="showcase-actions-secondary">
                   <button class="btn-preview btn-terminal-action" id="btn-showcase-preview">
                     <span id="preview-icon">▶</span>
@@ -674,7 +680,7 @@ export class ImportScreen {
     // Custom drop elements
     this.dropZone = this.element.querySelector('#import-drop-zone') as HTMLElement;
     this.customStatusElem = this.element.querySelector('#custom-status') as HTMLElement | null;
-    this.courseTypeBtns = Array.from(this.element.querySelectorAll('#custom-course-type .course-type-btn')) as HTMLButtonElement[];
+    this.courseTypeBtns = Array.from(this.element.querySelectorAll('.course-type-btn')) as HTMLButtonElement[];
     this.fileInput = this.element.querySelector('#import-file-input') as HTMLInputElement;
     this.browseBtn = this.element.querySelector('#btn-browse-file') as HTMLButtonElement;
 
@@ -1493,11 +1499,18 @@ export class ImportScreen {
 
   public setCourseType(courseType: CourseType): void {
     this.selectedCourseType = normalizeCourseType(courseType);
-    saveMenuPreferences({ mode: this.selectedCourseType === 'SURF' ? 'SURF' : 'NORMAL' });
+    const mode = this.selectedCourseType === 'SURF' ? 'SURF' : 'NORMAL';
+    saveMenuPreferences({ mode });
+    this.leaderboardPanel.setBoardKind(mode);
     for (const btn of this.courseTypeBtns) {
       const active = btn.dataset.courseType === this.selectedCourseType;
       btn.classList.toggle('active', active);
       btn.setAttribute('aria-checked', active ? 'true' : 'false');
+    }
+    if (this.showcaseEnterBtn) {
+      this.showcaseEnterBtn.innerHTML = this.selectedCourseType === 'SURF'
+        ? '<span class="exec-glyph">&gt;</span> EXEC SURF'
+        : '<span class="exec-glyph">&gt;</span> EXEC TRACK';
     }
   }
 

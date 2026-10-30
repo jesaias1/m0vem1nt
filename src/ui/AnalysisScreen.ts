@@ -28,7 +28,7 @@ export class AnalysisScreen {
   private academyTipElem!: HTMLElement;
   private onAcademyCallback?: () => void | Promise<void>;
   private academyBusy = false;
-  private surfVariant = false;
+  private surfVariant = true;
   private canReturnNormal = false;
 
   private durElem: HTMLElement;
@@ -99,7 +99,7 @@ export class AnalysisScreen {
         </div>
 
         <div class="analysis-footer">
-          <div id="analysis-variant" aria-live="polite">PLATFORMS_MODE</div>
+          <div id="analysis-variant" aria-live="polite">SURF_MODE</div>
           <div class="ready-academy-entry" id="analysis-academy-entry" hidden>
             <button class="btn-ready-academy" id="btn-ready-academy" type="button" hidden disabled>
               LEARN MOVEMENT // ACADEMY

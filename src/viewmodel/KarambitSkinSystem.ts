@@ -1834,6 +1834,19 @@ export class KarambitSkinSystem {
    * REPLACE, never merge: restoring account A's snapshot after account B must
    * never leave B's track records in place.
    */
+  private promotePendingSkinIfUnlocked(cloudEquippedSkinId?: string): boolean {
+    if (!this.pendingEquippedSkinId || !this.isSkinUnlocked(this.pendingEquippedSkinId)) return false;
+    if (!cloudEquippedSkinId || cloudEquippedSkinId === this.pendingEquippedSkinId) {
+      if (this.equippedSkinId !== this.pendingEquippedSkinId) {
+        this.equippedSkinId = this.pendingEquippedSkinId;
+        this.pendingEquippedSkinId = null;
+        return true;
+      }
+    }
+    this.pendingEquippedSkinId = null;
+    return false;
+  }
+
   public setTrackRecords(records: Record<string, RunRank> | null | undefined): void {
     const next: Record<string, RunRank> = {};
     for (const [k, v] of Object.entries(records ?? {})) {
@@ -1842,6 +1855,10 @@ export class KarambitSkinSystem {
       next[k] = v;
     }
     this.trackRecords = next;
+    if (this.promotePendingSkinIfUnlocked()) {
+      if (this.equippedSkinId !== this.activeVideo?.skinId) this.releaseActiveVideoTexture();
+      this.retainStaticTextureFor(this.equippedSkinId);
+    }
     this.saveState();
     this.notifyListeners();
   }
@@ -2288,7 +2305,9 @@ export class KarambitSkinSystem {
       }
     }
 
-    if (this.pendingEquippedSkinId && this.isSkinUnlocked(this.pendingEquippedSkinId)) {
+    if (this.promotePendingSkinIfUnlocked(cloud.equippedSkinId)) {
+      changed = true;
+    } else if (this.pendingEquippedSkinId && this.isSkinUnlocked(this.pendingEquippedSkinId)) {
       // The knife the player chose before progress finished loading is available now.
       if (!cloud.equippedSkinId || cloud.equippedSkinId === this.pendingEquippedSkinId) {
         this.equippedSkinId = this.pendingEquippedSkinId;

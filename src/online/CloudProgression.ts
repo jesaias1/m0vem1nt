@@ -312,15 +312,16 @@ export class CloudProgression {
     // snapshot being restored is itself untouched (the backup stays on disk).
     this.clearAccountBoundLocalState();
     const skins = KarambitSkinSystem.getInstance();
+    // Restore track records BEFORE applying cloud progression so rank-unlocked
+    // knives (Solar Flare, Nebula Pulse, Prism Shift, Blackstar) pass the
+    // unlock check when equippedSkinId is applied.
+    skins.setTrackRecords(snapshot.trackRecords);
     skins.applyCloudProgression({
       awardedRankKeys: snapshot.awardedRankKeys,
       rewardOwnedSkinIds: snapshot.rewardOwnedSkinIds,
       pendingDropRanks: snapshot.pendingDropRanks,
       equippedSkinId: snapshot.equippedSkinId
     });
-    // Track records and official PBs are part of the account and must be restored
-    // too, not silently dropped.
-    skins.setTrackRecords(snapshot.trackRecords);
     MasteryGloveSystem.getInstance().applyCloudEquippedGlove(snapshot.equippedGloveId);
     CustomAudioRewardService.getInstance().mergeCloudClaims(snapshot.customClaimFingerprints);
     LeaderboardManager.getInstance().restoreLocalRecords(

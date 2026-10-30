@@ -26,6 +26,7 @@ export class SurfVisuals {
   private traceGeom: THREE.BufferGeometry;
   private traceCount = 0;
   private traceMaterial: THREE.LineBasicMaterial;
+  private readonly scratchColor = new THREE.Color();
 
   // 3. Square Pixel Contact Sparks
   private readonly SPARK_COUNT = 40;
@@ -109,48 +110,68 @@ export class SurfVisuals {
     this.surfMaterial.emissiveIntensity = surfIntensity;
     this.surfMaterial.emissive.copy(visualState.palette.primary).lerp(visualState.palette.highlight, visualState.highlightMix);
 
-    // 2. Surf Contact Trace Ribbon
+    // 2. Surf Contact Trace Ribbon (zero per-frame heap allocation; distance-gated)
     if (isSurfing && !reduceMotion) {
       const pos = player.position;
       const contact = player.surfState.contactPoint.lengthSq() > 0 ? player.surfState.contactPoint : pos;
-      const contactColor = visualState.palette.highlight.clone().lerp(
+      const contactColor = this.scratchColor.copy(visualState.palette.highlight).lerp(
         visualState.palette.secondary,
         0.35 + Math.sin(visualState.time * 4.0) * 0.15
       );
+      const cy = contact.y + 0.08;
 
-      if (this.traceCount < this.TRACE_MAX_POINTS) {
-        const idx = this.traceCount * 3;
-        this.tracePositions[idx] = contact.x;
-        this.tracePositions[idx + 1] = contact.y + 0.08;
-        this.tracePositions[idx + 2] = contact.z;
-
-        this.traceColors[idx] = contactColor.r;
-        this.traceColors[idx + 1] = contactColor.g;
-        this.traceColors[idx + 2] = contactColor.b;
-
-        this.traceCount++;
+      if (this.traceCount === 0) {
+        this.tracePositions[0] = contact.x;
+        this.tracePositions[1] = cy;
+        this.tracePositions[2] = contact.z;
+        this.traceColors[0] = contactColor.r;
+        this.traceColors[1] = contactColor.g;
+        this.traceColors[2] = contactColor.b;
+        this.traceCount = 1;
       } else {
-        for (let i = 0; i < (this.TRACE_MAX_POINTS - 1) * 3; i++) {
-          this.tracePositions[i] = this.tracePositions[i + 3];
-          this.traceColors[i] = this.traceColors[i + 3];
-        }
-        const last = (this.TRACE_MAX_POINTS - 1) * 3;
-        this.tracePositions[last] = contact.x;
-        this.tracePositions[last + 1] = contact.y + 0.08;
-        this.tracePositions[last + 2] = contact.z;
+        const prevIdx = (this.traceCount - 1) * 3;
+        const dx = contact.x - this.tracePositions[prevIdx];
+        const dy = cy - this.tracePositions[prevIdx + 1];
+        const dz = contact.z - this.tracePositions[prevIdx + 2];
+        const distSq = dx * dx + dy * dy + dz * dz;
 
-        this.traceColors[last] = contactColor.r;
-        this.traceColors[last + 1] = contactColor.g;
-        this.traceColors[last + 2] = contactColor.b;
+        if (distSq >= 0.04) {
+          if (this.traceCount < this.TRACE_MAX_POINTS) {
+            const idx = this.traceCount * 3;
+            this.tracePositions[idx] = contact.x;
+            this.tracePositions[idx + 1] = cy;
+            this.tracePositions[idx + 2] = contact.z;
+            this.traceColors[idx] = contactColor.r;
+            this.traceColors[idx + 1] = contactColor.g;
+            this.traceColors[idx + 2] = contactColor.b;
+            this.traceCount++;
+          } else {
+            this.tracePositions.copyWithin(0, 3, this.TRACE_MAX_POINTS * 3);
+            this.traceColors.copyWithin(0, 3, this.TRACE_MAX_POINTS * 3);
+            const last = (this.TRACE_MAX_POINTS - 1) * 3;
+            this.tracePositions[last] = contact.x;
+            this.tracePositions[last + 1] = cy;
+            this.tracePositions[last + 2] = contact.z;
+            this.traceColors[last] = contactColor.r;
+            this.traceColors[last + 1] = contactColor.g;
+            this.traceColors[last + 2] = contactColor.b;
+          }
+        } else {
+          // Update tip in place so the ribbon stays locked to current contact point
+          this.tracePositions[prevIdx] = contact.x;
+          this.tracePositions[prevIdx + 1] = cy;
+          this.tracePositions[prevIdx + 2] = contact.z;
+        }
       }
 
       this.traceGeom.attributes.position.needsUpdate = true;
       this.traceGeom.attributes.color.needsUpdate = true;
       this.traceGeom.setDrawRange(0, this.traceCount);
 
-      // 3. Emit Square Pixel Sparks along contact
+      // 3. Emit Square Pixel Sparks along contact (scaled by surf speed)
       this.sparkMaterial.color.copy(visualState.palette.highlight);
-      for (let s = 0; s < 3; s++) {
+      const sparkBurst = speed > 650 ? 4 : speed > 420 ? 3 : 2;
+      for (let s = 0; s < sparkBurst; s++) {
         const freeIdx = this.findFreeSpark();
         if (freeIdx !== -1) {
           const s3 = freeIdx * 3;
@@ -160,9 +181,9 @@ export class SurfVisuals {
 
           // Spray backward along player velocity
           const v = player.velocity;
-          this.sparkVelocities[s3] = -v.x * 0.15 + (Math.random() - 0.5) * 4.0;
-          this.sparkVelocities[s3 + 1] = Math.random() * 3.0 + 1.0;
-          this.sparkVelocities[s3 + 2] = -v.z * 0.15 + (Math.random() - 0.5) * 4.0;
+          this.sparkVelocities[s3] = -v.x * 0.15 + (Math.random() - 0.5) * 4.0 * speedBoost;
+          this.sparkVelocities[s3 + 1] = (Math.random() * 3.0 + 1.0) * speedBoost;
+          this.sparkVelocities[s3 + 2] = -v.z * 0.15 + (Math.random() - 0.5) * 4.0 * speedBoost;
 
           this.sparkLifetimes[freeIdx] = 0.35 + Math.random() * 0.15;
         }

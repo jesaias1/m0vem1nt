@@ -62,6 +62,10 @@ export class Hud {
             <span class="hud-split-badge-label" id="hud-split-badge-label">VS ECHO</span>
             <span class="hud-split-badge-val" id="hud-split-badge-val">0.00s</span>
           </div>
+          <div class="hud-surf-flow-badge hidden" id="hud-surf-flow-badge">
+            <span class="hud-split-badge-label" id="hud-surf-flow-label">SURF FLOW</span>
+            <span class="hud-split-badge-val" id="hud-surf-flow-val">READY</span>
+          </div>
         </div>
         <div class="hud-progress-bar-container">
           <div class="hud-progress-bar-fill" id="hud-progress"></div>
@@ -96,6 +100,9 @@ export class Hud {
 
     this.restartHoldElem = this.element.querySelector('#hud-restart-hold') as HTMLElement;
     this.restartBarElem = this.element.querySelector('#hud-restart-bar') as HTMLElement;
+    this.surfFlowBadgeElem = this.element.querySelector('#hud-surf-flow-badge') as HTMLElement;
+    this.surfFlowLabelElem = this.element.querySelector('#hud-surf-flow-label') as HTMLElement;
+    this.surfFlowValElem = this.element.querySelector('#hud-surf-flow-val') as HTMLElement;
   }
 
   private surfIndicatorElem: HTMLElement;
@@ -113,6 +120,9 @@ export class Hud {
   private ghostTimeElem: HTMLElement;
   private restartHoldElem: HTMLElement;
   private restartBarElem: HTMLElement;
+  private surfFlowBadgeElem: HTMLElement;
+  private surfFlowLabelElem: HTMLElement;
+  private surfFlowValElem: HTMLElement;
   private splitTimeout: number | null = null;
   private surfHintTimeout: number | null = null;
 
@@ -252,6 +262,26 @@ export class Hud {
     // Deprecated in favor of post-fall tutorial hint
   }
 
+  /** Live Surf telemetry badge for SURF mode runs. */
+  public updateSurfTelemetry(active: boolean, isSurfing: boolean, surfSide: 'LEFT' | 'RIGHT' | 'NONE', speedUnits: number): void {
+    if (!this.surfFlowBadgeElem) return;
+    if (!active) {
+      this.surfFlowBadgeElem.classList.add('hidden');
+      return;
+    }
+    this.surfFlowBadgeElem.classList.remove('hidden');
+    if (isSurfing) {
+      const bank = surfSide === 'LEFT' ? 'BANK L' : surfSide === 'RIGHT' ? 'BANK R' : 'GLIDE';
+      this.surfFlowLabelElem.textContent = `SURF // ${bank}`;
+      this.surfFlowValElem.textContent = `${Math.round(speedUnits)} U/S`;
+      this.surfFlowValElem.className = 'hud-split-badge-val ahead';
+    } else {
+      this.surfFlowLabelElem.textContent = 'SURF FLOW';
+      this.surfFlowValElem.textContent = speedUnits >= 360 ? 'AIR TRANSFER' : 'APPROACH';
+      this.surfFlowValElem.className = 'hud-split-badge-val';
+    }
+  }
+
   public setOvertimeStatus(isOvertime: boolean, overtimeSeconds = 0): void {
     if (isOvertime) {
       if (!this.isOvertimeActive) {
@@ -293,7 +323,13 @@ export class Hud {
                           upper.includes('OVERTIME') ||
                           upper.includes('PB GHOST') ||
                           upper.includes('BLACKSTAR') ||
-                          upper.includes('RESTORE');
+                          upper.includes('RESTORE') ||
+                          upper.includes('FLOW') ||
+                          upper.includes('SURF') ||
+                          upper.includes('CLEAR') ||
+                          upper.includes('READ') ||
+                          upper.includes('CHAIN') ||
+                          upper.includes('TRANSFER');
       if (!isEssential) return;
     }
 
@@ -311,9 +347,17 @@ export class Hud {
   }
 
   public showOnboardingCue(msg: string, durationMs = 3800): void {
-    const showHints = SettingsManager.getInstance().settings.showHints;
-    if (!showHints) return;
-    this.showToast(msg, durationMs);
+    const settings = SettingsManager.getInstance().settings;
+    if (!settings.showHints || settings.terminalCallouts === 'OFF') return;
+    if (this.toastTimeout) {
+      clearTimeout(this.toastTimeout);
+    }
+    this.toastElem.textContent = msg;
+    this.toastElem.classList.add('active');
+    this.toastTimeout = window.setTimeout(() => {
+      this.toastElem.classList.remove('active');
+      this.toastTimeout = null;
+    }, durationMs);
   }
 
   public showSplit(split: SplitResult, durationMs = 2600): void {

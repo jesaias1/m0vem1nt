@@ -110,6 +110,7 @@ export class ResultsScreen {
   private onNextSignalCallback?: (trackId: string) => Promise<{ ok: boolean; detail: string }>;
   private onViewLeaderboardCallback?: () => void;
   private onRaceGhostCallback?: (runId: string) => Promise<{ ok: boolean; detail: string }>;
+  private onSignInCallback?: () => void;
 
   private revealTimeouts: number[] = [];
   /** Whether the CURRENT submission belongs to a registered account. */
@@ -344,6 +345,7 @@ export class ResultsScreen {
     onNextSignal?: (trackId: string) => Promise<{ ok: boolean; detail: string }>;
     onViewLeaderboard?: () => void;
     onRaceGhost?: (runId: string) => Promise<{ ok: boolean; detail: string }>;
+    onSignIn?: () => void;
   }): void {
     this.onReplayCallback = callbacks.onReplay;
     this.onAgainCallback = callbacks.onAgain;
@@ -353,6 +355,7 @@ export class ResultsScreen {
     this.onNextSignalCallback = callbacks.onNextSignal;
     this.onViewLeaderboardCallback = callbacks.onViewLeaderboard;
     this.onRaceGhostCallback = callbacks.onRaceGhost;
+    this.onSignInCallback = callbacks.onSignIn;
   }
 
   public showResults(
@@ -410,7 +413,13 @@ export class ResultsScreen {
      * NORMAL reward panels (Signal Drop, mastery) are suppressed — a SURF run
      * never earns NORMAL drops/progression/prestige.
      */
-    surfInfo?: { isSurf: true; boardTrackId: string; title: string }
+    surfInfo?: {
+      isSurf: true;
+      boardTrackId: string;
+      title: string;
+      officialTrackId?: string;
+      pbTime?: number | null;
+    }
   ): void {
     this.clearTimeouts();
     this.shareGeneration++;
@@ -443,7 +452,7 @@ export class ResultsScreen {
 
     const pbTime = isNewPersonalBest
       ? results.completionTime
-      : (recSummary?.pbTime ?? null);
+      : (recSummary?.pbTime ?? surfInfo?.pbTime ?? null);
 
     const localFirstTime = (officialInfo?.isNewLocalFirst && !overtimeInfo?.isOvertime)
       ? results.completionTime
@@ -531,7 +540,7 @@ export class ResultsScreen {
     const isSurfRun = surfInfo?.isSurf === true;
     this.surfBadgeElem.classList.toggle('hidden', !isSurfRun);
     if (isSurfRun) {
-      this.surfBadgeElem.textContent = '[SURF] SURF WORLD BOARD // NO PLATFORM REWARDS';
+      this.surfBadgeElem.textContent = '[SURF] BASE MODE // SURF WORLD BOARD';
     }
     this.prepareSignalDropPanel(
       isSurfRun ? 0 : (progressionInfo?.dropsAwarded ?? 0),
@@ -616,7 +625,8 @@ export class ResultsScreen {
       officialInfo,
       overtimeInfo,
       coreLoopInfo,
-      isNewPersonalBest
+      isNewPersonalBest,
+      surfInfo?.officialTrackId
     );
 
     // The goal opens the report and every action immediately.
@@ -699,7 +709,7 @@ export class ResultsScreen {
         this.signalDropReward.textContent = 'SIGN IN TO STORE DROP';
         this.signalDropCount.textContent = 'ACCOUNT REQUIRED FOR SIGNAL DROPS';
         this.signalDropOpenBtn.textContent = 'SIGN IN';
-        this.signalDropOpenBtn.disabled = true;
+        this.signalDropOpenBtn.disabled = !this.onSignInCallback;
         return;
       }
       this.signalDropPanel.classList.add('hidden');
@@ -743,6 +753,10 @@ export class ResultsScreen {
 
   private openSignalDrop(): void {
     const skinSystem = KarambitSkinSystem.getInstance();
+    if (this.signalDropOpenBtn.textContent === 'SIGN IN' && this.onSignInCallback) {
+      this.onSignInCallback();
+      return;
+    }
 
     // STRUCTURED drop: never open during results. Route to the Armory, where the
     // server-driven decoder (terminal randomizer, skippable) performs the open.
@@ -883,10 +897,12 @@ export class ResultsScreen {
     officialInfo?: { isOfficial: boolean; trackId: string; isNewLocalFirst?: boolean },
     overtimeInfo?: { isOvertime: boolean; overtimeDuration: number },
     coreLoopInfo?: { priorPbTime: number | null; diamondJustMastered: boolean; pbGhostAvailable: boolean; pbGhostLabel?: string | null },
-    isNewPersonalBest = false
+    isNewPersonalBest = false,
+    surfOfficialTrackId?: string
   ): void {
     const isOvertime = overtimeInfo?.isOvertime === true;
     const trackId = officialInfo?.trackId ?? null;
+    const catalogTrackId = trackId ?? surfOfficialTrackId ?? null;
 
     // NEXT TARGET: the next rank above this run, honest about time vs clean-run.
     const target = nextRankTarget(
@@ -908,10 +924,10 @@ export class ResultsScreen {
 
     // Only offer the deterministic next official signal for official runs.
     let nextSignalId: string | null = null;
-    if (trackId && SignalPackCatalog.getTrackById(trackId)) {
+    if (catalogTrackId && SignalPackCatalog.getTrackById(catalogTrackId)) {
       // Authoritative ranks, exactly the ones mastery derives from.
       const ranks = masteryGloveSystem.getProgress().ranks;
-      const next = nextSignalAfter(SignalPackCatalog.getTracks(), trackId, ranks);
+      const next = nextSignalAfter(SignalPackCatalog.getTracks(), catalogTrackId, ranks);
       if (next) {
         nextSignalId = next.id;
         lines.push(`NEXT SIGNAL // ${next.title}`);

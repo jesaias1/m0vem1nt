@@ -32,6 +32,14 @@ import { computeAnalysisIdentity } from './MapIdentity';
 /** Namespace prefix for a surf board track id. */
 export const SURF_BOARD_NAMESPACE = 'surf';
 
+/** Extracts the official catalog track id and map fingerprint from a surf board track id, or null. */
+export function parseSurfBoardTrackId(trackId: string): { officialTrackId: string; mapFingerprint: string } | null {
+  if (!trackId || !trackId.startsWith(`${SURF_BOARD_NAMESPACE}:`)) return null;
+  const parts = trackId.split(':');
+  if (parts.length < 4 || !parts[1]) return null;
+  return { officialTrackId: parts[1], mapFingerprint: parts.slice(3).join(':') };
+}
+
 /**
  * Deterministic namespaced board id for an official SURF map. The fingerprint
  * is part of the id so ANY geometry/version change automatically opens a fresh
