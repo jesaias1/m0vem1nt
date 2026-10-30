@@ -547,6 +547,16 @@ export class ViewmodelController {
     this.beginAction('INSPECT', INSPECT_KEYS);
   }
 
+  /**
+   * Celebratory Karambit ring flourish on a clean high-speed surf transfer or
+   * completed flow-ring chain. Only starts when the hand is idle so it never
+   * interrupts a manual inspect or active spin. Presentation only.
+   */
+  public triggerSurfTransferFlourish(): boolean {
+    if (this.activeAction !== 'NONE') return false;
+    return this.triggerSpin();
+  }
+
   private beginAction(kind: 'SPIN' | 'INSPECT', keys: ActionKey[]): void {
     // Start from wherever the hand currently is, so interrupting an inspect
     // with a spin (or chaining spins) blends instead of popping.
@@ -1158,7 +1168,7 @@ export class ViewmodelController {
     this.motionGroup.position.set(0, this.compressionY + this.airOffset.y + this.feedbackAccentY, this.airOffset.z);
     this.motionGroup.rotation.set(this.airRotOffset.x, this.airRotOffset.y, this.airRotOffset.z);
 
-    // 7. Surfing Balance Stance
+    // 7. Surfing Balance Stance (Speed-scaled carve bank & slipstream tuck on motionGroup)
     const targetSurfBlend = isSurfing ? 1.0 : 0.0;
     this.surfBlend += (targetSurfBlend - this.surfBlend) * Math.min(1.0, dt * 7.0);
 
@@ -1166,11 +1176,16 @@ export class ViewmodelController {
       const surfSide = player.surfState.surfSide;
       const targetSideTilt = surfSide === 'LEFT' ? -1.0 : (surfSide === 'RIGHT' ? 1.0 : 0.0);
       this.surfSideTilt += (targetSideTilt - this.surfSideTilt) * Math.min(1.0, dt * 8.0);
+      const surfSpeedRatio = clamp((speed - 280.0) / 560.0, 0, 1);
 
-      // Downhill surf lean
-      const tiltAngle = this.surfSideTilt * 0.08 * this.surfBlend;
+      // Downhill surf lean + speed-scaled aerodynamic carve tuck
+      const tiltAngle = this.surfSideTilt * (0.08 + 0.045 * surfSpeedRatio) * this.surfBlend;
       this.motionGroup.rotation.z += tiltAngle;
-      this.motionGroup.position.x += -this.surfSideTilt * 0.015 * this.surfBlend;
+      this.motionGroup.rotation.x += -0.028 * surfSpeedRatio * this.surfBlend;
+      this.motionGroup.position.x += -this.surfSideTilt * (0.015 + 0.008 * surfSpeedRatio) * this.surfBlend;
+      if (isSurfing && surfSpeedRatio > 0.25) {
+        this.audioImpact = Math.max(this.audioImpact, surfSpeedRatio * 0.38);
+      }
     }
 
     // 8. Knife Socket Attachment

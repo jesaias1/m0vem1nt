@@ -29,12 +29,20 @@ export class SurfVisuals {
   private readonly scratchColor = new THREE.Color();
 
   // 3. Square Pixel Contact Sparks
-  private readonly SPARK_COUNT = 40;
+  private readonly SPARK_COUNT = 72;
   private sparkPositions: Float32Array;
+  private sparkColors: Float32Array;
   private sparkVelocities: Float32Array;
   private sparkLifetimes: Float32Array;
   private sparkPoints: THREE.Points;
   private sparkMaterial: THREE.PointsMaterial;
+
+  // 4. Transfer Catch Shockwave Ring (zero per-frame allocation)
+  private catchRingMesh: THREE.Mesh;
+  private catchRingMaterial: THREE.MeshBasicMaterial;
+  private catchRingPulse = 0;
+  private readonly scratchTarget = new THREE.Vector3();
+  private readonly hotColor = new THREE.Color(0xfff4d0);
 
   constructor(scene: THREE.Scene) {
     this.group = new THREE.Group();
@@ -67,24 +75,47 @@ export class SurfVisuals {
 
     // 3. Square Pixel Sparks
     this.sparkPositions = new Float32Array(this.SPARK_COUNT * 3);
+    this.sparkColors = new Float32Array(this.SPARK_COUNT * 3);
     this.sparkVelocities = new Float32Array(this.SPARK_COUNT * 3);
     this.sparkLifetimes = new Float32Array(this.SPARK_COUNT);
+    for (let i = 0; i < this.SPARK_COUNT * 3; i++) {
+      this.sparkColors[i] = 1.0;
+    }
 
     const sparkGeom = new THREE.BufferGeometry();
     sparkGeom.setAttribute('position', new THREE.BufferAttribute(this.sparkPositions, 3));
+    sparkGeom.setAttribute('color', new THREE.BufferAttribute(this.sparkColors, 3));
 
     const squareTex = createSparkTexture();
     this.sparkMaterial = new THREE.PointsMaterial({
-      color: 0x7ee7f8,
-      size: 0.28,
+      color: 0xffffff,
+      vertexColors: true,
+      size: 0.3,
       map: squareTex,
       transparent: true,
-      opacity: 0.9,
+      opacity: 0.92,
+      blending: THREE.AdditiveBlending,
       depthWrite: false
     });
     this.sparkPoints = new THREE.Points(sparkGeom, this.sparkMaterial);
     this.sparkPoints.frustumCulled = false;
     this.group.add(this.sparkPoints);
+
+    // 4. Transfer Catch Shockwave Ring
+    const ringGeom = new THREE.RingGeometry(0.55, 0.72, 16);
+    this.catchRingMaterial = new THREE.MeshBasicMaterial({
+      color: 0x00f0ff,
+      transparent: true,
+      opacity: 0,
+      side: THREE.DoubleSide,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      toneMapped: false
+    });
+    this.catchRingMesh = new THREE.Mesh(ringGeom, this.catchRingMaterial);
+    this.catchRingMesh.visible = false;
+    this.catchRingMesh.frustumCulled = false;
+    this.group.add(this.catchRingMesh);
 
     scene.add(this.group);
   }
@@ -169,8 +200,9 @@ export class SurfVisuals {
       this.traceGeom.setDrawRange(0, this.traceCount);
 
       // 3. Emit Square Pixel Sparks along contact (scaled by surf speed)
-      this.sparkMaterial.color.copy(visualState.palette.highlight);
-      const sparkBurst = speed > 650 ? 4 : speed > 420 ? 3 : 2;
+      const hyperMix = Math.min(1, Math.max(0, (speed - 460) / 360));
+      const sparkCol = this.scratchColor.copy(visualState.palette.highlight).lerp(this.hotColor, hyperMix * 0.75);
+      const sparkBurst = speed > 650 ? 5 : speed > 420 ? 3 : 2;
       for (let s = 0; s < sparkBurst; s++) {
         const freeIdx = this.findFreeSpark();
         if (freeIdx !== -1) {
@@ -179,19 +211,37 @@ export class SurfVisuals {
           this.sparkPositions[s3 + 1] = contact.y + 0.1 + Math.random() * 0.2;
           this.sparkPositions[s3 + 2] = contact.z + (Math.random() - 0.5) * 0.4;
 
+          this.sparkColors[s3] = sparkCol.r;
+          this.sparkColors[s3 + 1] = sparkCol.g;
+          this.sparkColors[s3 + 2] = sparkCol.b;
+
           // Spray backward along player velocity
           const v = player.velocity;
-          this.sparkVelocities[s3] = -v.x * 0.15 + (Math.random() - 0.5) * 4.0 * speedBoost;
-          this.sparkVelocities[s3 + 1] = (Math.random() * 3.0 + 1.0) * speedBoost;
-          this.sparkVelocities[s3 + 2] = -v.z * 0.15 + (Math.random() - 0.5) * 4.0 * speedBoost;
+          this.sparkVelocities[s3] = -v.x * 0.15 + (Math.random() - 0.5) * 4.2 * speedBoost;
+          this.sparkVelocities[s3 + 1] = (Math.random() * 3.2 + 1.0) * speedBoost;
+          this.sparkVelocities[s3 + 2] = -v.z * 0.15 + (Math.random() - 0.5) * 4.2 * speedBoost;
 
-          this.sparkLifetimes[freeIdx] = 0.35 + Math.random() * 0.15;
+          this.sparkLifetimes[freeIdx] = 0.35 + Math.random() * 0.18;
         }
       }
+      this.sparkPoints.geometry.attributes.color.needsUpdate = true;
     } else {
       if (this.traceCount > 0) {
         this.traceCount = Math.max(0, this.traceCount - 4);
         this.traceGeom.setDrawRange(0, this.traceCount);
+      }
+    }
+
+    // 4. Update Transfer Catch Shockwave Ring
+    if (this.catchRingPulse > 0) {
+      this.catchRingPulse = Math.max(0, this.catchRingPulse - dt * 2.5);
+      if (this.catchRingPulse <= 0) {
+        this.catchRingMesh.visible = false;
+      } else {
+        const progress = 1 - this.catchRingPulse;
+        const scale = 0.45 + progress * 2.4;
+        this.catchRingMesh.scale.setScalar(scale);
+        this.catchRingMaterial.opacity = this.catchRingPulse * 0.85;
       }
     }
 
@@ -218,9 +268,66 @@ export class SurfVisuals {
     return -1;
   }
 
+  /**
+   * Fires a 3D shockwave ring + radial pixel spark burst at the surf contact point
+   * when the player catches a surf ramp out of an air transfer.
+   */
+  public triggerTransferBurst(
+    player: PlayerController,
+    visualState: MusicVisualState,
+    intensity = 1
+  ): void {
+    if (SettingsManager.getInstance().settings.reduceMotion) return;
+    const contact = player.surfState.contactPoint.lengthSq() > 0 ? player.surfState.contactPoint : player.position;
+    const normal = player.surfState.surfNormal.lengthSq() > 0 ? player.surfState.surfNormal : null;
+
+    this.catchRingMesh.position.set(
+      contact.x + (normal ? normal.x * 0.08 : 0),
+      contact.y + (normal ? normal.y * 0.08 : 0.08),
+      contact.z + (normal ? normal.z * 0.08 : 0)
+    );
+    if (normal) {
+      this.scratchTarget.set(
+        this.catchRingMesh.position.x + normal.x,
+        this.catchRingMesh.position.y + normal.y,
+        this.catchRingMesh.position.z + normal.z
+      );
+      this.catchRingMesh.lookAt(this.scratchTarget);
+    } else {
+      this.catchRingMesh.rotation.set(-Math.PI * 0.5, 0, 0);
+    }
+    this.catchRingMaterial.color.copy(visualState.palette.highlight).lerp(this.hotColor, 0.45);
+    this.catchRingPulse = Math.min(1, Math.max(0.55, intensity));
+    this.catchRingMesh.scale.setScalar(0.45);
+    this.catchRingMesh.visible = true;
+
+    const sparkCol = this.scratchColor.copy(visualState.palette.highlight).lerp(this.hotColor, 0.65);
+    for (let s = 0; s < 14; s++) {
+      const freeIdx = this.findFreeSpark();
+      if (freeIdx === -1) break;
+      const s3 = freeIdx * 3;
+      const angle = (s / 14) * Math.PI * 2;
+      this.sparkPositions[s3] = contact.x + Math.cos(angle) * 0.25;
+      this.sparkPositions[s3 + 1] = contact.y + 0.12;
+      this.sparkPositions[s3 + 2] = contact.z + Math.sin(angle) * 0.25;
+
+      this.sparkColors[s3] = sparkCol.r;
+      this.sparkColors[s3 + 1] = sparkCol.g;
+      this.sparkColors[s3 + 2] = sparkCol.b;
+
+      this.sparkVelocities[s3] = Math.cos(angle) * 6.5 * intensity;
+      this.sparkVelocities[s3 + 1] = (2.2 + Math.random() * 2.5) * intensity;
+      this.sparkVelocities[s3 + 2] = Math.sin(angle) * 6.5 * intensity;
+      this.sparkLifetimes[freeIdx] = 0.42 + Math.random() * 0.16;
+    }
+    this.sparkPoints.geometry.attributes.color.needsUpdate = true;
+  }
+
   public clear(): void {
     this.traceCount = 0;
     this.traceGeom.setDrawRange(0, 0);
+    this.catchRingPulse = 0;
+    this.catchRingMesh.visible = false;
     for (let i = 0; i < this.SPARK_COUNT; i++) {
       this.sparkLifetimes[i] = 0;
     }
@@ -235,6 +342,8 @@ export class SurfVisuals {
     this.surfMaterial.dispose();
     this.sparkPoints.geometry.dispose();
     this.sparkMaterial.dispose();
+    this.catchRingMesh.geometry.dispose();
+    this.catchRingMaterial.dispose();
     this.group.clear();
   }
 }

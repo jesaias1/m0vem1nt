@@ -64,6 +64,7 @@ function makeSinks() {
     nearMiss: vi.fn(),
     landing: vi.fn(),
     surfLock: vi.fn(),
+    surfTransfer: vi.fn(),
     finish: vi.fn()
   };
 }
@@ -259,6 +260,49 @@ describe('Movement feedback — surf exit', () => {
 
     expect(sinks.surfLock).toHaveBeenCalledTimes(1);
     expect(controller.state.lastEvent).toBe('SURF LOCK');
+  });
+
+  it('tracks unbroken ramp-to-ramp surf transfer chains and live speed gain', () => {
+    const sinks = makeSinks();
+    const controller = new MovementFeedbackController(sinks);
+    const player = makePlayer();
+    const physics = makeObstaclePhysics();
+
+    // Airborne approach into first surf ramp
+    player.isGrounded = false;
+    player.isSurfing = false;
+    player.velocity.x = 12; // 480 u/s
+    for (let i = 0; i < 35; i++) {
+      controller.update(DT, player as unknown as PlayerController, physics);
+    }
+
+    // Catch ramp 1
+    player.isSurfing = true;
+    player.surfState.entrySpeed = 12;
+    player.velocity.x = 15; // 600 u/s (+120 u/s gain)
+    controller.update(DT, player as unknown as PlayerController, physics);
+    expect(sinks.surfTransfer).toHaveBeenCalledTimes(1);
+    expect(controller.state.surfChain).toBe(1);
+    expect(controller.state.surfSpeedGainUnits).toBe(120);
+
+    // Airborne transfer into ramp 2 without touching ground
+    player.isSurfing = false;
+    for (let i = 0; i < 35; i++) {
+      controller.update(DT, player as unknown as PlayerController, physics);
+    }
+    player.isSurfing = true;
+    player.surfState.entrySpeed = 15;
+    player.velocity.x = 18; // 720 u/s
+    controller.update(DT, player as unknown as PlayerController, physics);
+    expect(sinks.surfTransfer).toHaveBeenCalledTimes(2);
+    expect(controller.state.surfChain).toBe(2);
+
+    // Touching flat ground resets the surf chain
+    player.isSurfing = false;
+    player.isGrounded = true;
+    controller.update(DT, player as unknown as PlayerController, physics);
+    expect(controller.state.surfChain).toBe(0);
+    expect(controller.state.surfSpeedGainUnits).toBe(0);
   });
 });
 

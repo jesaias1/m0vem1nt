@@ -33,8 +33,8 @@ import {
 export interface MovementFeedbackSinks {
   nearMiss(intensity: number, side: number, obstacleId: number): void;
   landing(intensity: number, major: boolean): void;
-  surfLock(quality: number): void;
-  surfTransfer?(speedUnits: number, airtime: number): void;
+  surfLock(quality: number, speedGainUnits?: number, surfChain?: number): void;
+  surfTransfer?(speedUnits: number, airtime: number, surfChain: number): void;
   finish(): void;
 }
 
@@ -45,6 +45,8 @@ export interface MovementFeedbackState {
   landingIntensity: number;
   landingMajor: boolean;
   surfQuality: number;
+  surfChain: number;
+  surfSpeedGainUnits: number;
   lastNearMissId: number;
   lastEvent: string;
   lastEventTime: number;
@@ -59,6 +61,8 @@ export class MovementFeedbackController {
     landingIntensity: 0,
     landingMajor: false,
     surfQuality: 0,
+    surfChain: 0,
+    surfSpeedGainUnits: 0,
     lastNearMissId: -1,
     lastEvent: '—',
     lastEventTime: 0,
@@ -113,6 +117,8 @@ export class MovementFeedbackController {
     this.state.landingIntensity = 0;
     this.state.landingMajor = false;
     this.state.surfQuality = 0;
+    this.state.surfChain = 0;
+    this.state.surfSpeedGainUnits = 0;
     this.state.lastNearMissId = -1;
     this.state.lastEvent = '—';
     this.state.lastEventTime = 0;
@@ -165,9 +171,9 @@ export class MovementFeedbackController {
       }
     }
     // --- Surf enter / exit ----------------------------------------------
-    if (player.isSurfing) {
-      this.lastSurfSpeedUnits = speedUnits;
-      this.lastSurfTime = player.surfState.timeSurfing;
+    if (player.isGrounded && !player.isSurfing) {
+      this.state.surfChain = 0;
+      this.state.surfSpeedGainUnits = 0;
     }
     if (!this.prevSurfing && player.isSurfing) {
       this.surfEntrySpeedUnits = Math.max(
@@ -175,11 +181,18 @@ export class MovementFeedbackController {
         player.surfState.entrySpeed * player.config.speedUnitScale
       );
       if (this.airtime >= 0.22 && speedUnits >= 360) {
-        this.sinks.surfTransfer?.(speedUnits, this.airtime);
+        this.state.surfChain = Math.min(12, this.state.surfChain + 1);
+        this.sinks.surfTransfer?.(speedUnits, this.airtime, this.state.surfChain);
         this.setLastEvent('SURF TRANSFER');
       } else {
+        if (this.state.surfChain === 0) this.state.surfChain = 1;
         this.setLastEvent('SURF ENTER');
       }
+    }
+    if (player.isSurfing) {
+      this.lastSurfSpeedUnits = speedUnits;
+      this.lastSurfTime = player.surfState.timeSurfing;
+      this.state.surfSpeedGainUnits = Math.max(0, Math.round(speedUnits - this.surfEntrySpeedUnits));
     }
     if (player.isGrounded || player.isSurfing) {
       this.airtime = 0;
@@ -192,9 +205,10 @@ export class MovementFeedbackController {
         timeSurfing: this.lastSurfTime
       });
       this.state.surfQuality = result.quality;
+      const speedGain = Math.max(0, Math.round(this.lastSurfSpeedUnits - this.surfEntrySpeedUnits));
       if (result.perfect && this.surfLockCooldown <= 0) {
         this.surfLockCooldown = SURF_LOCK_COOLDOWN;
-        this.sinks.surfLock(result.quality);
+        this.sinks.surfLock(result.quality, speedGain, Math.max(1, this.state.surfChain));
         this.setLastEvent('SURF LOCK');
       }
     }

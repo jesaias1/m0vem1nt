@@ -686,17 +686,28 @@ export class Game {
         this.viewmodelController.triggerMovementAccent(major ? 'HARD_LANDING' : 'LANDING', intensity);
         this.world.pulseSignal(major ? 0.4 * intensity : 0.14 * intensity);
       },
-      surfLock: (quality) => {
-        this.movementSfx.playSurfLock(quality);
+      surfLock: (quality, speedGain = 0, streak = 1) => {
+        this.movementSfx.playSurfLock(quality, streak);
         this.viewmodelController.triggerMovementAccent('SURF_LOCK', quality);
         this.world.pulseSignal(0.32 * quality);
-        this.ui.hud.showToast('SIGNAL LOCK // CLEAN SURF', 1200);
+        const chainLabel = streak >= 2 ? ` x${streak}` : '';
+        const detail = speedGain >= 25 ? `+${speedGain} U/S` : 'CLEAN SURF';
+        this.ui.hud.showToast(`SIGNAL LOCK${chainLabel} // ${detail}`, 1200);
       },
-      surfTransfer: (speedUnits) => {
-        this.movementSfx.playSurfLock(0.85);
-        this.viewmodelController.triggerMovementAccent('SURF_LOCK', 0.85);
-        this.world.pulseSignal(0.28);
-        this.ui.hud.showToast(`AIR TRANSFER // ${Math.round(speedUnits)} U/S`, 1100);
+      surfTransfer: (speedUnits, _airtime, streak) => {
+        this.movementSfx.playSurfTransferCatch(speedUnits, streak);
+        this.viewmodelController.triggerMovementAccent('SURF_LOCK', 0.9);
+        this.surfVisuals.triggerTransferBurst(
+          this.playerController,
+          this.world.visualController.state,
+          Math.min(1, 0.65 + streak * 0.1)
+        );
+        if (streak >= 2 || speedUnits >= 460) {
+          this.viewmodelController.triggerSurfTransferFlourish();
+        }
+        this.world.pulseSignal(Math.min(0.55, 0.26 + streak * 0.06));
+        const label = streak >= 2 ? `SURF TRANSFER x${streak}` : 'AIR TRANSFER';
+        this.ui.hud.showToast(`${label} // ${Math.round(speedUnits)} U/S`, 1150);
       },
       finish: () => {
         this.movementSfx.playFinishImpact();
@@ -2592,8 +2603,10 @@ export class Game {
       this.movementSfx.playFlowRing(hit.count);
       this.viewmodelController.triggerMovementAccent('SURF_LOCK', hit.complete ? 0.7 : 0.3);
       if (hit.complete) {
+        this.viewmodelController.triggerSurfTransferFlourish();
+        this.surfVisuals.triggerTransferBurst(this.playerController, this.world.visualController.state, 1.0);
         this.ui.hud.showToast(`FLOW CHAIN // ${hit.total}/${hit.total}`, 1100);
-        this.world.pulseSignal(0.14);
+        this.world.pulseSignal(0.22);
       }
     }
     this.racingLine.setFrames(surf ? this.ghostManager.getPbFrames() : null);
@@ -3295,8 +3308,9 @@ export class Game {
             });
             if (clear) {
               this.ui.hud.showToast(`${SURF_CHALLENGE_LABEL[clear.kind]} // FLOW x${clear.streak}`, 1250);
-              this.movementSfx.playSurfLock(0.45);
-              this.world.pulseSignal(0.16);
+              this.movementSfx.playSurfLock(0.55, clear.streak);
+              if (clear.streak >= 2) this.viewmodelController.triggerSurfTransferFlourish();
+              this.world.pulseSignal(0.2);
             }
           } else this.surfChallenges.suspend();
           this.playerController.cameraPresentationOffsetY = this.movementFeedback.state.cameraOffsetY;
@@ -3398,7 +3412,9 @@ export class Game {
         this.playerController.isSurfing || this.playerController.surfState.isSurfing,
         this.playerController.surfState.surfSide,
         this.playerController.getSpeedUnits(),
-        this.resolveUpcomingSurfBankHint()
+        this.resolveUpcomingSurfBankHint(),
+        this.movementFeedback.state.surfChain,
+        this.movementFeedback.state.surfSpeedGainUnits
       );
 
       // Onboarding Guidance for FIRST CONTACT

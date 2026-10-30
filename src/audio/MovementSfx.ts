@@ -266,30 +266,71 @@ export class MovementSfx {
     src.stop(now + 0.1);
   }
 
-  /** Short digital "SIGNAL LOCK" confirmation for a clean surf exit. */
-  public playSurfLock(quality: number): void {
+  /** Short digital "SIGNAL LOCK" confirmation for a clean surf exit, pitched with chain streak. */
+  public playSurfLock(quality: number, streak = 1): void {
     const ctx = this.getContext();
     if (!ctx) return;
     const vol = this.master() * Math.min(1, Math.max(0, quality));
     if (vol <= 0.001) return;
 
     const now = ctx.currentTime;
-    const freqs = [660, 990];
-    freqs.forEach((freq, i) => {
+    const pitchMult = 1 + Math.min(7, Math.max(0, streak - 1)) * 0.065;
+    const freqs = streak >= 3 ? [660, 990, 1320] : [660, 990];
+    freqs.forEach((baseFreq, i) => {
+      const freq = baseFreq * pitchMult;
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
-      const delay = i * 0.055;
+      const delay = i * 0.05;
       osc.type = 'triangle';
       osc.frequency.setValueAtTime(freq, now + delay);
       osc.frequency.exponentialRampToValueAtTime(freq * 1.5, now + delay + 0.09);
       gain.gain.setValueAtTime(0.0001, now + delay);
-      gain.gain.exponentialRampToValueAtTime(0.11 * vol, now + delay + 0.012);
+      gain.gain.exponentialRampToValueAtTime(0.115 * vol, now + delay + 0.012);
       gain.gain.exponentialRampToValueAtTime(0.0001, now + delay + 0.16);
       osc.connect(gain);
       gain.connect(ctx.destination);
       osc.start(now + delay);
       osc.stop(now + delay + 0.18);
     });
+  }
+
+  /** Crisp sub-bass ramp lock + ascending harmonic shimmer on air-to-surf transfer catch. */
+  public playSurfTransferCatch(speedUnits: number, streak = 1): void {
+    const ctx = this.getContext();
+    if (!ctx) return;
+    const speedNorm = Math.min(1, Math.max(0.35, (speedUnits - 320) / 500));
+    const vol = this.master() * speedNorm;
+    if (vol <= 0.001) return;
+
+    const now = ctx.currentTime;
+    const pitchMult = 1 + Math.min(7, Math.max(0, streak - 1)) * 0.06;
+
+    // Tactile sub-bass magnetic catch
+    const sub = ctx.createOscillator();
+    const subGain = ctx.createGain();
+    sub.type = 'sine';
+    sub.frequency.setValueAtTime(165 * pitchMult, now);
+    sub.frequency.exponentialRampToValueAtTime(52, now + 0.11);
+    subGain.gain.setValueAtTime(0.18 * vol, now);
+    subGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.13);
+    sub.connect(subGain);
+    subGain.connect(ctx.destination);
+    sub.start(now);
+    sub.stop(now + 0.15);
+
+    // Ascending harmonic shimmer
+    const chime = ctx.createOscillator();
+    const chimeGain = ctx.createGain();
+    chime.type = 'triangle';
+    chime.frequency.setValueAtTime(587.33 * pitchMult, now);
+    chime.frequency.exponentialRampToValueAtTime(1174.66 * pitchMult, now + 0.12);
+    chimeGain.gain.setValueAtTime(0.0001, now);
+    chimeGain.gain.exponentialRampToValueAtTime(0.1 * vol, now + 0.015);
+    chimeGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.18);
+    chime.connect(chimeGain);
+    chimeGain.connect(ctx.destination);
+    chime.start(now);
+    chime.stop(now + 0.2);
   }
 
   /**

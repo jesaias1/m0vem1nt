@@ -268,7 +268,9 @@ export class Hud {
     isSurfing: boolean,
     surfSide: 'LEFT' | 'RIGHT' | 'NONE',
     speedUnits: number,
-    nextBankHint?: string | null
+    nextBankHint?: string | null,
+    surfChain = 0,
+    speedGainUnits = 0
   ): void {
     if (!this.surfFlowBadgeElem) return;
     if (!active) {
@@ -278,13 +280,15 @@ export class Hud {
     this.surfFlowBadgeElem.classList.remove('hidden');
     if (isSurfing) {
       const bank = surfSide === 'LEFT' ? 'BANK L' : surfSide === 'RIGHT' ? 'BANK R' : 'GLIDE';
-      this.surfFlowLabelElem.textContent = `SURF // ${bank}`;
-      this.surfFlowValElem.textContent = `${Math.round(speedUnits)} U/S`;
+      const chainTag = surfChain >= 2 ? ` x${surfChain}` : '';
+      const gainTag = speedGainUnits >= 15 ? ` (+${speedGainUnits})` : '';
+      this.surfFlowLabelElem.textContent = `SURF${chainTag} // ${bank}`;
+      this.surfFlowValElem.textContent = `${Math.round(speedUnits)} U/S${gainTag}`;
       this.surfFlowValElem.className = 'hud-split-badge-val ahead';
     } else {
-      this.surfFlowLabelElem.textContent = 'SURF FLOW';
+      this.surfFlowLabelElem.textContent = surfChain >= 2 ? `SURF CHAIN x${surfChain}` : 'SURF FLOW';
       this.surfFlowValElem.textContent = nextBankHint || (speedUnits >= 360 ? 'AIR TRANSFER' : 'APPROACH');
-      this.surfFlowValElem.className = 'hud-split-badge-val';
+      this.surfFlowValElem.className = surfChain >= 2 ? 'hud-split-badge-val ahead' : 'hud-split-badge-val';
     }
   }
 
