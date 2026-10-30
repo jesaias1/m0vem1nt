@@ -38,6 +38,9 @@ function pad2(n: number): string {
 import { KarambitSkinSystem, OpenedSignalDrop } from '../viewmodel/KarambitSkinSystem';
 import { createProgramFingerprint } from './SignalIdentity';
 import { LeaderboardManager } from '../leaderboard/LeaderboardManager';
+import { OFFICIAL_MAP_REGISTRY } from '../online/OfficialMapRegistry';
+import { getSurfRegistryEntryForOfficialTrack, parseSurfBoardTrackId } from '../online/SurfMapIdentity';
+import { replayStorageService } from '../online/ReplayStorageService';
 import { PresetLevelCache } from '../audio/PresetLevelCache';
 import { formatTime } from '../utils/math';
 import { RacePanel } from './RacePanel';
@@ -783,7 +786,7 @@ export class ImportScreen {
       empty.textContent = 'No signals match. Clear filters to show all tracks.'; this.selectorStripElem.appendChild(empty);
     }
     filtered.forEach(({ entry: t, displayIndex, isTutorial }) => {
-      const summary = LeaderboardManager.getInstance().getRecordSummary(t.id);
+      const summary = LeaderboardManager.getInstance().getRecordSummary(this.getRecordKeyForTrack(t.id));
       const bestRank = summary.bestRank;
       const rankClass = bestRank ? `rank-${bestRank.toLowerCase()}` : '';
       const mastered = rankValue(bestRank) >= 4;
@@ -878,6 +881,21 @@ export class ImportScreen {
     this.updateShowcaseCard(this.selectedTrack);
   }
 
+  private getRecordKeyForTrack(trackId: string): string {
+    if (this.selectedCourseType === 'SURF') {
+      return getSurfRegistryEntryForOfficialTrack(trackId)?.trackId ?? trackId;
+    }
+    return trackId;
+  }
+
+  private getFingerprintForRecordKey(recordKey: string): string | null {
+    return (
+      OFFICIAL_MAP_REGISTRY.find((e) => e.trackId === recordKey)?.mapFingerprint ??
+      getSurfRegistryEntryForOfficialTrack(parseSurfBoardTrackId(recordKey)?.officialTrackId ?? recordKey)?.mapFingerprint ??
+      null
+    );
+  }
+
   private updateShowcaseCard(t: TrackCatalogEntry): void {
     this.showcaseTitleElem.textContent = t.title;
     this.showcaseArtistElem.textContent = t.artist;
@@ -891,7 +909,9 @@ export class ImportScreen {
     this.showcaseDiffElem.textContent = `TIER ${'I'.repeat(Math.min(5, t.difficulty))} · ${t.difficultyLabel}`;
     this.showcaseDescElem.textContent = `> ${t.description}`;
 
-    const summary = LeaderboardManager.getInstance().getRecordSummary(t.id);
+    const baseSummary = LeaderboardManager.getInstance().getRecordSummary(t.id);
+    const recordKey = this.getRecordKeyForTrack(t.id);
+    const summary = recordKey === t.id ? baseSummary : LeaderboardManager.getInstance().getRecordSummary(recordKey);
     const bestRankElem = this.element.querySelector('#showcase-best-rank') as HTMLElement;
     const pbElem = this.element.querySelector('#showcase-pb-time') as HTMLElement;
     const local1Elem = this.element.querySelector('#showcase-local-first') as HTMLElement;
@@ -899,6 +919,19 @@ export class ImportScreen {
     // Default the PB-ghost action to unavailable; Game confirms availability
     // once it knows whether a usable recorded replay exists for this track.
     this.setPbGhostAvailability({ available: false, pbTimeSeconds: summary.pbTime });
+    const ghostInfo = LeaderboardManager.getInstance().resolveGhostAvailability(
+      recordKey,
+      this.getFingerprintForRecordKey(recordKey),
+      (finishTimeUs) => replayStorageService.getLocal(recordKey, finishTimeUs) !== null
+    );
+    if (ghostInfo.available || ghostInfo.pbTimeUs !== null) {
+      this.setPbGhostAvailability({
+        available: ghostInfo.available,
+        pbTimeSeconds: ghostInfo.pbTimeUs !== null ? ghostInfo.pbTimeUs / 1_000_000 : summary.pbTime,
+        actionText: ghostInfo.actionText,
+        state: ghostInfo.state
+      });
+    }
 
     if (bestRankElem) {
       if (summary.bestRank) {
@@ -970,7 +1003,7 @@ export class ImportScreen {
   private renderNextTier(trackId: string, duration: number | null): void {
     const element = this.element.querySelector('#showcase-next-tier') as HTMLElement | null;
     if (!element) return;
-    const summary = LeaderboardManager.getInstance().getRecordSummary(trackId);
+    const summary = LeaderboardManager.getInstance().getRecordSummary(this.getRecordKeyForTrack(trackId));
     element.className = 'record-val';
     if (rankValue(summary.bestRank) >= 4) {
       element.textContent = 'MASTERED';
@@ -1512,6 +1545,10 @@ export class ImportScreen {
         ? '<span class="exec-glyph">&gt;</span> EXEC SURF'
         : '<span class="exec-glyph">&gt;</span> EXEC TRACK';
     }
+    if (this.selectorStripElem && this.selectorStripElem.childElementCount > 0) {
+      this.buildStrip();
+      this.updateShowcaseCard(this.selectedTrack);
+    }
   }
 
   public setCustomStatus(message: string | null, kind: 'info' | 'error' = 'info'): void {
@@ -1540,7 +1577,8 @@ export class ImportScreen {
    * recorded run actually belongs to.
    */
   public getCatalogEntry(trackId: string): TrackCatalogEntry | null {
-    return this.catalog.find((t) => t.id === trackId) ?? null;
+    const baseId = parseSurfBoardTrackId(trackId)?.officialTrackId ?? trackId;
+    return this.catalog.find((t) => t.id === baseId) ?? null;
   }
 
   public show(): void {
@@ -1755,7 +1793,7 @@ export class ImportScreen {
     this.showcaseRacePbBtn.addEventListener('click', () => {
       if (this.showcaseRacePbBtn.disabled) return;
       this.stopPreview();
-      this.onRacePbGhostCallback?.(this.selectedTrack.id);
+      this.onRacePbGhostCallback?.(this.getRecordKeyForTrack(this.selectedTrack.id));
     });
 
     this.masteryDevPreviewBtn.addEventListener('click', () => {

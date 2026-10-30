@@ -54,7 +54,12 @@ import { validateDisplayName } from '../online/AuthService';
 import { computeMapIdentity } from '../online/MapIdentity';
 import type { MapIdentity } from '../online/MapIdentity';
 import { OFFICIAL_MAP_REGISTRY } from '../online/OfficialMapRegistry';
-import { computeSurfMapIdentity, parseSurfBoardTrackId } from '../online/SurfMapIdentity';
+import {
+  SURF_MAP_REGISTRY,
+  computeSurfMapIdentity,
+  getSurfRegistryEntryForOfficialTrack,
+  parseSurfBoardTrackId
+} from '../online/SurfMapIdentity';
 import {
   RemoteRacerGhosts,
   GUEST_SIGNAL_COLOR,
@@ -612,7 +617,10 @@ export class Game {
       onRetryVsPb: () => {
         // Explicit PB duel: only THIS action arms a ghost. A plain RETRY never
         // does, so the ghost toggle is respected.
-        const trackId = this.currentOfficialTrackId;
+        const surfTrackId = this.currentCourseType === 'SURF' && this.currentSurfOfficialTrackId
+          ? getSurfRegistryEntryForOfficialTrack(this.currentSurfOfficialTrackId)?.trackId ?? null
+          : null;
+        const trackId = this.currentOfficialTrackId ?? surfTrackId;
         if (!trackId || this.friendRaceWorld) return Promise.resolve({ ok: false, detail: 'PB DUEL UNAVAILABLE' });
         return this.racePbGhostAndPlay(trackId);
       },
@@ -832,6 +840,7 @@ export class Game {
       // The wind / speed layer only belongs to active play or the Lab.
       if (newState !== GameState.PLAYING && newState !== GameState.MOVEMENT_LAB) {
         this.movementSfx.setWindLevel(0);
+        this.movementSfx.setSurfCarveLevel(0);
       }
 
       switch (newState) {
@@ -1109,14 +1118,25 @@ export class Game {
               // NORMAL board; the run never touches NORMAL progression, drops or
               // prestige (currentOfficialTrackId is null above). surfInfo drives
               // the SURF badge on the report and the board submission below.
-              priorPbTime = priorGhostPbTime;
               const surfIdentity = this.surfMapIdentity();
               if (surfIdentity) {
+                priorPbTime =
+                  LeaderboardManager.getInstance().getRecordSummary(surfIdentity.trackId).pbTime ??
+                  priorGhostPbTime;
+                const isSurfValid = !this.movementLab && results.rank !== 'UNRANKED';
+                LeaderboardManager.getInstance().recordOfficialRun(
+                  surfIdentity.trackId,
+                  this.currentTrack.seed,
+                  results,
+                  isSurfValid
+                );
                 surfInfo = {
                   boardTrackId: surfIdentity.trackId,
                   title: this.currentAnalysis.filename || 'M0VEM1NT TRACK',
                   officialTrackId: this.currentSurfOfficialTrackId ?? ''
                 };
+              } else {
+                priorPbTime = priorGhostPbTime;
               }
             } else if (this.currentCustomAudioBuffer && this.currentCourseType !== 'SURF') {
               // Custom audio run
@@ -1147,7 +1167,9 @@ export class Game {
             // replay actually exists. Never offer an action that silently does
             // nothing (custom audio and non-canonical maps record no replay).
             this.ui.resultsScreen.setReplayAvailable(this.hasLocalReplay());
-            const pbGhost = this.resolvePbGhostAvailable(this.currentOfficialTrackId);
+            const pbGhost = this.resolvePbGhostAvailable(
+              this.currentOfficialTrackId ?? surfInfo?.boardTrackId ?? null
+            );
             if (this.friendRaceWorld && this.currentOfficialTrackId) {
               this.ui.importScreen.racePanel.setRunFeedback({
                 rank: results.rank,
@@ -2578,6 +2600,41 @@ export class Game {
     this.racingLine.update(this.playerController.position, surf && settings.racingLine !== false);
   }
 
+  /**
+   * Allocation-free lookahead for the next surf ramp's bank direction while
+   * airborne or approaching a ribbon in SURF mode.
+   */
+  private resolveUpcomingSurfBankHint(): string | null {
+    if (this.currentCourseType !== 'SURF' || !this.currentTrack) return null;
+    if (this.playerController.isSurfing || this.playerController.surfState.isSurfing) return null;
+    const pos = this.playerController.position;
+    const yaw = this.cameraController.yaw;
+    const fwdX = -Math.sin(yaw);
+    const fwdZ = -Math.cos(yaw);
+    const rightX = Math.cos(yaw);
+    const rightZ = -Math.sin(yaw);
+    let bestDistSq = 65 * 65;
+    let bestDotRight = 0;
+    const route = this.currentTrack.route;
+    for (let i = 0; i < route.length; i++) {
+      const node = route[i];
+      if (!node.isSurf || !node.surfNormal) continue;
+      const dx = node.position.x - pos.x;
+      const dy = node.position.y - pos.y;
+      const dz = node.position.z - pos.z;
+      const fwdDot = dx * fwdX + dz * fwdZ;
+      if (fwdDot < 2.0 || fwdDot > 65.0) continue;
+      const distSq = dx * dx + dy * dy + dz * dz;
+      if (distSq < bestDistSq) {
+        bestDistSq = distSq;
+        bestDotRight = node.surfNormal.x * rightX + node.surfNormal.z * rightZ;
+      }
+    }
+    if (bestDotRight > 0.12) return 'NEXT: [A] BANK L';
+    if (bestDotRight < -0.12) return 'NEXT: [D] BANK R';
+    return null;
+  }
+
   private restartTrack(): void {
     if (this.friendRaceWorld && this.raceActive && raceRoomService.getRoom() !== null && !this.raceFinishReported && this.racePhase !== 'FINISHED') {
       // The shared start cannot be restarted from one client: it would reset the
@@ -3340,7 +3397,8 @@ export class Game {
         this.currentCourseType === 'SURF',
         this.playerController.isSurfing || this.playerController.surfState.isSurfing,
         this.playerController.surfState.surfSide,
-        this.playerController.getSpeedUnits()
+        this.playerController.getSpeedUnits(),
+        this.resolveUpcomingSurfBankHint()
       );
 
       // Onboarding Guidance for FIRST CONTACT
@@ -3366,6 +3424,13 @@ export class Game {
       const speedFeel = this.movementFeedback.state.speedIntensity;
       this.environment.setSpeedStreak(speedFeel * 0.42, settings.reduceMotion);
       this.movementSfx.setWindLevel(speedFeel * 0.55);
+      const isSurfActive = this.playerController.isSurfing || this.playerController.surfState.isSurfing;
+      const surfSpeedRatio = Math.max(0, Math.min(1, (this.playerController.getSpeedUnits() - 220) / 680));
+      this.movementSfx.setSurfCarveLevel(
+        isSurfActive ? 0.35 + 0.65 * surfSpeedRatio : 0,
+        surfSpeedRatio,
+        this.playerController.surfState.surfSide
+      );
 
       // Dev Diagnostics update
       if (this.devOverlay.visible) {
@@ -3438,6 +3503,13 @@ export class Game {
       const labReduceMotion = SettingsManager.getInstance().settings.reduceMotion;
       this.environment.setSpeedStreak(labSpeedFeel * 0.42, labReduceMotion);
       this.movementSfx.setWindLevel(labSpeedFeel * 0.55);
+      const labSurfActive = this.playerController.isSurfing || this.playerController.surfState.isSurfing;
+      const labSurfSpeedRatio = Math.max(0, Math.min(1, (this.playerController.getSpeedUnits() - 220) / 680));
+      this.movementSfx.setSurfCarveLevel(
+        labSurfActive ? 0.35 + 0.65 * labSurfSpeedRatio : 0,
+        labSurfSpeedRatio,
+        this.playerController.surfState.surfSide
+      );
       if (this.devOverlay.visible) {
         this.devOverlay.update(this.playerController, this.world, this.audioEngine, this.environment, this.smoothedFps, this.movementFeedback.state, this.gateDiagnostics(), this.raceGhostDiagnostics());
       }
@@ -5774,7 +5846,11 @@ export class Game {
 
   /** Shipped canonical map fingerprint for a track id, or null when unknown. */
   private canonicalFingerprintFor(trackId: string): string | null {
-    return OFFICIAL_MAP_REGISTRY.find((e) => e.trackId === trackId)?.mapFingerprint ?? null;
+    return (
+      OFFICIAL_MAP_REGISTRY.find((e) => e.trackId === trackId)?.mapFingerprint ??
+      SURF_MAP_REGISTRY.find((e) => e.trackId === trackId)?.mapFingerprint ??
+      null
+    );
   }
 
   /** Correct, non-conflated ghost label for a resolved ghost time. */
@@ -5821,7 +5897,8 @@ export class Game {
     });
     if (!built.ok) return { ok: false, detail: Game.ghostRejectionDetail(built.reason) };
 
-    await this.handleCatalogTrackSelected(entry, built.run);
+    const parsedSurf = parseSurfBoardTrackId(trackId);
+    await this.handleCatalogTrackSelected(entry, built.run, parsedSurf ? 'SURF' : DEFAULT_COURSE_TYPE);
     return { ok: true, detail: 'GHOST // VERIFIED' };
   }
 
@@ -5896,10 +5973,17 @@ export class Game {
    */
   public refreshPbGhostAvailability(trackId: string): void {
     const manager = LeaderboardManager.getInstance();
+    const surfKey = !parseSurfBoardTrackId(trackId) && this.currentCourseType === 'SURF'
+      ? (getSurfRegistryEntryForOfficialTrack(trackId)?.trackId ?? trackId)
+      : trackId;
+    const effectiveId =
+      manager.getPbTimeUs(surfKey) !== null || manager.getGhostReplayRef(surfKey) !== null
+        ? surfKey
+        : trackId;
     const info = manager.resolveGhostAvailability(
-      trackId,
-      this.canonicalFingerprintFor(trackId),
-      (finishTimeUs) => replayStorageService.getLocal(trackId, finishTimeUs) !== null
+      effectiveId,
+      this.canonicalFingerprintFor(effectiveId),
+      (finishTimeUs) => replayStorageService.getLocal(effectiveId, finishTimeUs) !== null
     );
 
     this.ui.importScreen.setPbGhostAvailability({

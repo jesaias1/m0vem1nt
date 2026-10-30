@@ -263,7 +263,13 @@ export class Hud {
   }
 
   /** Live Surf telemetry badge for SURF mode runs. */
-  public updateSurfTelemetry(active: boolean, isSurfing: boolean, surfSide: 'LEFT' | 'RIGHT' | 'NONE', speedUnits: number): void {
+  public updateSurfTelemetry(
+    active: boolean,
+    isSurfing: boolean,
+    surfSide: 'LEFT' | 'RIGHT' | 'NONE',
+    speedUnits: number,
+    nextBankHint?: string | null
+  ): void {
     if (!this.surfFlowBadgeElem) return;
     if (!active) {
       this.surfFlowBadgeElem.classList.add('hidden');
@@ -277,7 +283,7 @@ export class Hud {
       this.surfFlowValElem.className = 'hud-split-badge-val ahead';
     } else {
       this.surfFlowLabelElem.textContent = 'SURF FLOW';
-      this.surfFlowValElem.textContent = speedUnits >= 360 ? 'AIR TRANSFER' : 'APPROACH';
+      this.surfFlowValElem.textContent = nextBankHint || (speedUnits >= 360 ? 'AIR TRANSFER' : 'APPROACH');
       this.surfFlowValElem.className = 'hud-split-badge-val';
     }
   }

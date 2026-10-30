@@ -20,6 +20,13 @@ export class MovementSfx {
   private windGain: GainNode | null = null;
   private windLevel = 0;
 
+  // Persistent surf carve layer (reused while surfing ramps).
+  private carveSource: AudioBufferSourceNode | null = null;
+  private carveFilter: BiquadFilterNode | null = null;
+  private carveGain: GainNode | null = null;
+  private carvePan: StereoPannerNode | null = null;
+  private carveLevel = 0;
+
   private constructor() {}
 
   public static getInstance(): MovementSfx {
@@ -466,8 +473,67 @@ export class MovementSfx {
     this.windLevel = target;
   }
 
+  /**
+   * Continuous surf carve layer while gliding along a ramp.
+   * Sweeps a resonant bandpass filter with speed and pans subtly toward the banked ramp side.
+   */
+  public setSurfCarveLevel(level: number, speedRatio = 0, bankSide: 'LEFT' | 'RIGHT' | 'NONE' = 'NONE'): void {
+    const target = Math.max(0, Math.min(1, level));
+    const speed = Math.max(0, Math.min(1, speedRatio));
+    if (Math.abs(target - this.carveLevel) < 0.005 && target <= 0.001) return;
+
+    if (target <= 0.001 && !this.carveSource) {
+      this.carveLevel = target;
+      return;
+    }
+
+    const ctx = this.getContext();
+    if (!ctx) return;
+
+    if (!this.carveSource) {
+      const src = ctx.createBufferSource();
+      src.buffer = this.makeNoiseBuffer(ctx, 2.0);
+      src.loop = true;
+      const filter = ctx.createBiquadFilter();
+      filter.type = 'bandpass';
+      filter.Q.setValueAtTime(3.2, ctx.currentTime);
+      filter.frequency.setValueAtTime(520, ctx.currentTime);
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+      src.connect(filter);
+      filter.connect(gain);
+      if (typeof ctx.createStereoPanner === 'function') {
+        const pan = ctx.createStereoPanner();
+        gain.connect(pan);
+        pan.connect(ctx.destination);
+        this.carvePan = pan;
+      } else {
+        gain.connect(ctx.destination);
+      }
+      src.start();
+      this.carveSource = src;
+      this.carveFilter = filter;
+      this.carveGain = gain;
+    }
+
+    const now = ctx.currentTime;
+    if (this.carveGain) {
+      this.carveGain.gain.cancelScheduledValues(now);
+      this.carveGain.gain.setTargetAtTime(0.065 * target * this.master(), now, 0.08);
+    }
+    if (this.carveFilter) {
+      this.carveFilter.frequency.setTargetAtTime(480 + 1150 * speed, now, 0.1);
+    }
+    if (this.carvePan) {
+      const panTarget = bankSide === 'LEFT' ? -0.18 : bankSide === 'RIGHT' ? 0.18 : 0;
+      this.carvePan.pan.setTargetAtTime(panTarget, now, 0.12);
+    }
+    this.carveLevel = target;
+  }
+
   public reset(): void {
     this.setWindLevel(0);
+    this.setSurfCarveLevel(0);
   }
 
   public dispose(): void {
@@ -476,9 +542,19 @@ export class MovementSfx {
     } catch {
       // already stopped
     }
+    try {
+      this.carveSource?.stop();
+    } catch {
+      // already stopped
+    }
     this.windSource = null;
     this.windFilter = null;
     this.windGain = null;
     this.windLevel = 0;
+    this.carveSource = null;
+    this.carveFilter = null;
+    this.carveGain = null;
+    this.carvePan = null;
+    this.carveLevel = 0;
   }
 }

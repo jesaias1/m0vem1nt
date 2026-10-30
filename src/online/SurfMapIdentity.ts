@@ -98,6 +98,11 @@ import { OFFICIAL_SURF_MAP_REGISTRY } from './OfficialSurfMapRegistry';
 /** Canonical SURF registry entries (namespaced ids). */
 export const SURF_MAP_REGISTRY: readonly RegistryEntry[] = OFFICIAL_SURF_MAP_REGISTRY;
 
+export function getSurfRegistryEntryForOfficialTrack(officialTrackId: string): RegistryEntry | undefined {
+  const prefix = `${SURF_BOARD_NAMESPACE}:${officialTrackId}:v${SURF_GENERATION_VERSION}:`;
+  return SURF_MAP_REGISTRY.find((e) => e.trackId.startsWith(prefix));
+}
+
 export function getSurfRegistryEntry(trackId: string): RegistryEntry | undefined {
   return SURF_MAP_REGISTRY.find((e) => e.trackId === trackId);
 }
