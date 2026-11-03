@@ -278,6 +278,7 @@ export class ArmoryPreview {
   private previewPoseRestore: { bone: THREE.Object3D; position: THREE.Vector3; quaternion: THREE.Quaternion }[] = [];
 
   private readonly skinSystem = KarambitSkinSystem.createPreviewInstance();
+  private unsubscribeSkin: (() => void) | null = null;
   // Browsing gloves must never evict the texture worn by the gameplay rig.
   private readonly gloveCache = new GloveTextureCache(undefined, undefined, 1);
   private selection: ArmoryPreviewSelection | null = null;
@@ -549,6 +550,12 @@ export class ArmoryPreview {
         return;
       }
       this.installRig(rig);
+      // A skin texture finishes loading AFTER it was applied: re-apply it when it does,
+      // so the preview never needs a second click to show the real skin.
+      this.unsubscribeSkin ??= this.skinSystem.addListener(() => {
+        if (this.disposed || !this.rig) return;
+        this.rig.applySkin(this.skinSystem.getActiveRenderSkinId());
+      });
     } catch (e) {
       this.rigFailed = true;
       console.warn('[ArmoryPreview] Failed to build preview rig:', e);
@@ -910,6 +917,8 @@ export class ArmoryPreview {
     this.removeSingleGloveGeometry();
     this.rig?.dispose();
     this.rig = null;
+    this.unsubscribeSkin?.();
+    this.unsubscribeSkin = null;
     this.skinSystem.dispose();
     this.gloveCache.clear();
     this.renderer?.dispose();
