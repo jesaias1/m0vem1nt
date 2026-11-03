@@ -739,3 +739,14 @@ html, body { background: var(--desktop); font-family: var(--font-sans); -webkit-
 #ui-root .my-track-row { display: flex; align-items: center; gap: 8px; padding: 4px 8px; background: rgba(0, 0, 0, 0.22); }
 #ui-root .my-track-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 14px/1.2 var(--font-sans); }
 #ui-root .my-track-play, #ui-root .my-track-del { padding: 3px 10px; font: 14px/1.2 var(--font-mono); cursor: pointer; }
+
+/* Armory tiles: whole-pixel, readable text with room to breathe (no tiny rem sizes). */
+#ui-root .armory-inventory { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+#ui-root .armory-tile { min-height: 76px; padding: 10px 12px 8px; gap: 8px; font-family: var(--font-sans); }
+#ui-root .armory-tile-name { font: 700 14px/1.25 var(--font-sans); letter-spacing: 0; color: var(--ink); padding-right: 22px; text-transform: uppercase; }
+#ui-root .armory-tile-rarity { font: 13px/1.2 var(--font-sans); letter-spacing: 0.5px; }
+#ui-root .armory-tile-mark { font: 15px/1 var(--font-sans); }
+#ui-root .armory-tile.locked { opacity: 1; }
+#ui-root .armory-tile.locked .armory-tile-name { color: var(--muted); }
+#ui-root .armory-tile.locked .armory-tile-swatch { opacity: 0.55; }
+#ui-root .armory-tile.equipped { outline: 2px solid var(--accent-color, #00f0ff); outline-offset: -2px; }

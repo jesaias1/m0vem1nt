@@ -29,7 +29,8 @@ import {
   isEquippable,
   armoryDetailRows,
   collectionProgress,
-  resolveSelection
+  resolveSelection,
+  UNKNOWN_ARTIFACT_NAME
 } from './ArmoryInventory';
 
 /** Two-digit zero padding for mastery counters. */
@@ -1253,9 +1254,12 @@ export class ImportScreen {
     if (!item.owned) tile.classList.add('locked');
 
     const mark = item.equipped ? '✓' : item.owned ? '·' : '⊘';
+    tile.title = item.equipped ? 'Equipped' : item.owned ? 'Owned' : 'Locked: select it to see how to unlock';
+    // A sealed item is already labelled by its rarity (ARTIFACT); do not say it twice.
+    const tileName = item.name === UNKNOWN_ARTIFACT_NAME ? 'SEALED' : item.name;
     tile.innerHTML =
       `<span class="armory-tile-swatch" aria-hidden="true"></span>` +
-      `<span class="armory-tile-name">${item.name}</span>` +
+      `<span class="armory-tile-name">${tileName}</span>` +
       `<span class="armory-tile-foot">` +
       `<span class="armory-tile-rarity">${displayRarity(item.rarity)}</span>` +
       `<span class="armory-tile-mark" aria-hidden="true">${mark}</span>` +
