@@ -2,9 +2,12 @@
    Geometry, visibility states and gameplay remain owned by their modules. */
 @font-face { font-family: 'Pixel Sans'; src: url('/assets/fonts/ms-sans-serif.woff2') format('woff2'); font-weight: 400; font-display: swap; }
 @font-face { font-family: 'Pixel Sans'; src: url('/assets/fonts/ms-sans-serif-bold.woff2') format('woff2'); font-weight: 700 900; font-display: swap; }
+/* Pixelify Sans (SIL OFL): a vector pixel font, so it stays crisp at any size or screen scaling, unlike the bitmap-style font. */
+@font-face { font-family: 'Pixelify Sans'; src: url('/assets/fonts/pixelify-sans-400.woff2') format('woff2'); font-weight: 400; font-display: swap; }
+@font-face { font-family: 'Pixelify Sans'; src: url('/assets/fonts/pixelify-sans-700.woff2') format('woff2'); font-weight: 600 900; font-display: swap; }
 @font-face { font-family: 'Terminal'; src: url('/assets/fonts/vt323-latin.woff2') format('woff2'); font-weight: 400; font-display: swap; }
 :root {
-  --font-sans: 'Pixel Sans', Tahoma, sans-serif;
+  --font-sans: 'Pixelify Sans', 'Pixel Sans', Tahoma, sans-serif;
   --font-mono: 'Terminal', 'Courier New', monospace;
   --desktop: #112c32;
   --face: #c0c0c0;
@@ -41,7 +44,7 @@ html, body { background: var(--desktop); font-family: var(--font-sans); -webkit-
   --border-strong: #000; --accent-color: var(--link); --accent-rgb: 0, 0, 128;
   --accent-glow: transparent; --accent-dim: var(--face-light);
   padding: 24px; background: var(--desktop); backdrop-filter: none;
-  font: 12px/1.5 var(--font-sans); color: var(--ink); transition: none;
+  font: 13px/1.5 var(--font-sans); color: var(--ink); transition: none;
 }
 /* Retire the previous editorial typography and effects, including nested modules. */
 #ui-root .screen * {
@@ -612,7 +615,7 @@ html, body { background: var(--desktop); font-family: var(--font-sans); -webkit-
 #ui-root .desktop-menubar .brand-logo-text { height: 15px; width: auto; max-width: none; filter: none; vertical-align: middle; }
 
 /* Crisp pixel text: no kerning or synthesis, so glyph spacing stays even on the bitmap-style fonts. */
-#ui-root, #ui-root * { font-kerning: none; font-synthesis: none; text-rendering: optimizeSpeed; }
+#ui-root, #ui-root * { font-kerning: none; font-synthesis: none; text-rendering: auto; }
 
 /* Room code: big and easy to read across a room. */
 #ui-root .online-lobby-code { font-size: clamp(2.6rem, 6vw, 4.2rem); letter-spacing: 0.28em; font-weight: 700; line-height: 1.1; text-shadow: 0 0 18px rgba(0, 240, 255, 0.45); user-select: all; }
@@ -759,3 +762,4 @@ html, body { background: var(--desktop); font-family: var(--font-sans); -webkit-
 #ui-root .analysis-footer #analysis-variant { flex: 0 0 100%; }
 #ui-root #btn-ready-surf { order: 1; margin-right: auto; font: 14px/1.2 var(--font-sans); letter-spacing: 1px; white-space: nowrap; padding: 10px 16px; }
 #ui-root #btn-enter-track { order: 2; margin-left: auto; font-size: 16px; letter-spacing: 1px; white-space: nowrap; }
+#ui-root .my-tracks[hidden] { display: none; }

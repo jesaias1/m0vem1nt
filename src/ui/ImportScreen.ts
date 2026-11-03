@@ -422,7 +422,7 @@ export class ImportScreen {
                 <!-- Populated dynamically via buildStrip() -->
               </div>
               <div class="showcase-mastery-strip" id="showcase-mastery-strip"></div>
-              <section class="my-tracks" aria-label="My tracks">
+              <section class="my-tracks" aria-label="My tracks" hidden>
                 <div class="terminal-panel-header catalog-header"><span>MY TRACKS // THIS PC ONLY</span><span class="catalog-count" id="my-tracks-count"></span></div>
                 <div class="my-tracks-list" id="my-tracks-list"></div>
               </section>
@@ -1888,6 +1888,9 @@ export class ImportScreen {
     const tracks = await myTracksStore.list();
     if (count) count.textContent = tracks.length ? String(tracks.length) : '';
     list.replaceChildren();
+    // Nothing kept yet: no empty box, the section appears with the first saved song.
+    const section = this.element.querySelector<HTMLElement>('.my-tracks');
+    if (section) section.hidden = tracks.length === 0;
     if (tracks.length === 0) {
       const hint = document.createElement('div');
       hint.className = 'my-tracks-empty';
