@@ -262,7 +262,8 @@ export class AnalysisScreen {
       progress: loadProgress(typeof localStorage !== 'undefined' ? localStorage : null),
       variant: this.surfVariant ? 'SURF' : 'NORMAL'
     });
-    const visible = entry.visible && !this.enterBtn.disabled && !this.academyBusy;
+    // The Academy has its own place on the front menu; it is not offered on this screen.
+    const visible = false && entry.visible && !this.enterBtn.disabled && !this.academyBusy;
     (this.element.querySelector('#analysis-academy-entry') as HTMLElement).hidden = !visible;
     this.academyBtn.hidden = !visible;
     this.academyBtn.disabled = !visible;

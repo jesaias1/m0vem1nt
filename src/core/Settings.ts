@@ -53,7 +53,7 @@ export type SettingsListener = (
 
 const DEFAULT_SETTINGS: GameSettings = {
   mouseSensitivity: 1.0,
-  fov: 100,
+  fov: 110,
   masterVolume: 0.8,
   reduceMotion: false,
   holdToBhop: true,
@@ -66,7 +66,7 @@ const DEFAULT_SETTINGS: GameSettings = {
   viewmodelAccent: 'ADAPTIVE',
   terminalCallouts: 'MINIMAL',
   hideHud: false,
-  viewmodelFov: 80,
+  viewmodelFov: 85,
   viewmodelSway: 1.0,
   spinTrail: true,
   flowRings: true,

@@ -750,3 +750,12 @@ html, body { background: var(--desktop); font-family: var(--font-sans); -webkit-
 #ui-root .armory-tile.locked .armory-tile-name { color: var(--muted); }
 #ui-root .armory-tile.locked .armory-tile-swatch { opacity: 0.55; }
 #ui-root .armory-tile.equipped { outline: 2px solid var(--accent-color, #00f0ff); outline-offset: -2px; }
+
+/* Slider value read-outs */
+#ui-root .settings-value { min-width: 48px; text-align: right; font: 16px/1 var(--font-mono); color: var(--ink); }
+
+/* Ready screen: the other-mode button sits on the LEFT, out of the way, with crisp whole-pixel text. */
+#ui-root .analysis-footer { justify-content: space-between; }
+#ui-root .analysis-footer #analysis-variant { flex: 0 0 100%; }
+#ui-root #btn-ready-surf { order: 1; margin-right: auto; font: 14px/1.2 var(--font-sans); letter-spacing: 1px; white-space: nowrap; padding: 10px 16px; }
+#ui-root #btn-enter-track { order: 2; margin-left: auto; font-size: 16px; letter-spacing: 1px; white-space: nowrap; }

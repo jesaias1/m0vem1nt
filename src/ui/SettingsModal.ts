@@ -69,6 +69,11 @@ export class SettingsModal {
         </div>
 
         <div class="settings-row">
+          <label class="settings-label">VIEWMODEL FOV</label>
+          <input type="range" class="settings-input" id="set-vm-fov" min="50" max="85" step="1" />
+        </div>
+
+        <div class="settings-row">
           <label class="settings-label">REDUCE MOTION</label>
           <input type="checkbox" id="set-motion" />
         </div>
@@ -120,11 +125,6 @@ export class SettingsModal {
             <option value="MINIMAL">MINIMAL (RIGHT HAND ONLY)</option>
             <option value="OFF">OFF (DISABLED)</option>
           </select>
-        </div>
-
-        <div class="settings-row">
-          <label class="settings-label">VIEWMODEL FOV</label>
-          <input type="range" class="settings-input" id="set-vm-fov" min="50" max="85" step="1" />
         </div>
 
         <div class="settings-row">
@@ -260,6 +260,27 @@ export class SettingsModal {
     this.spinTrailInput.checked = s.spinTrail !== false;
     this.flowRingsInput.checked = s.flowRings !== false;
     this.racingLineInput.checked = s.racingLine !== false;
+    this.syncValueLabels();
+  }
+
+  /** Every slider shows its number (mouse sensitivity has its own editable field). */
+  private syncValueLabels(): void {
+    this.element.querySelectorAll<HTMLInputElement>('input[type="range"]').forEach((slider) => {
+      if (slider.id === 'set-sens') return;
+      let label = slider.nextElementSibling as HTMLElement | null;
+      if (!label || !label.classList.contains('settings-value')) {
+        label = document.createElement('span');
+        label.className = 'settings-value';
+        slider.after(label);
+        slider.addEventListener('input', () => this.syncValueLabels());
+      }
+      const v = parseFloat(slider.value);
+      label.textContent =
+        slider.id === 'set-vol' ? `${Math.round(v * 100)}%`
+        : slider.id === 'set-spin-speed' ? `${v.toFixed(1)}x`
+        : slider.step.includes('.') ? v.toFixed(1)
+        : String(Math.round(v));
+    });
   }
 
   private initEvents(): void {
