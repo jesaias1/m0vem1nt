@@ -110,6 +110,8 @@ export class AudioAnalyzer {
     const currentMag = new Float32Array(fftSize / 2);
 
     for (let f = 0; f < numFrames; f++) {
+      // Give the page a turn (loading animation, input) every few hundred frames.
+      if (f > 0 && f % 192 === 0) await yieldThread();
       const offset = f * hopSize;
 
       // Extract windowed frame & calculate RMS
@@ -204,6 +206,7 @@ export class AudioAnalyzer {
     const thresholdWindow = Math.floor(0.2 / windowSec); // ~200ms moving window for dynamic threshold
 
     for (let f = 2; f < numFrames - 2; f++) {
+      if (f % 2000 === 0) await yieldThread();
       const val = normFlux[f];
       if (val < 0.15) continue; // Noise floor
 

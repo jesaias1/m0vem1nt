@@ -329,8 +329,10 @@ export class ResultsScreen {
     const options = document.createElement('details');
     options.className = 'results-secondary-actions';
     options.innerHTML = '<summary>MORE OPTIONS</summary><div></div>';
-    [this.leaderboardBtn, this.viewLeaderboardBtn, this.replayBtn, this.newTrackBtn]
+    [this.leaderboardBtn, this.viewLeaderboardBtn, this.replayBtn]
       .forEach(button => options.querySelector('div')!.appendChild(button));
+    // MAIN MENU stays visible: it must never hide behind an expander.
+    this.actionsRow.appendChild(this.newTrackBtn);
     this.actionsRow.appendChild(options);
 
     this.initEvents();

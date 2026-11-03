@@ -334,7 +334,7 @@ export class Game {
   private relockOnNextInput = false;
   private relockPointerListener: (() => void) | null = null;
   /** Map chosen in the map picker for the current song (null = its own map). */
-  private selectedMapKey: string | null = null;
+  private selectedMapKey: string | null = this.savedMapKey();
   /** Board kind + official song id of the LAST finished run (results actions). */
   private lastResultBoardKind: 'NORMAL' | 'SURF' = 'NORMAL';
   private lastResultBoardOfficialTrackId: string | null = null;
@@ -630,6 +630,7 @@ export class Game {
         const entry = MusicPack.getTrackById(trackId);
         if (!entry || this.friendRaceWorld) return { ok: false, detail: 'NEXT SIGNAL UNAVAILABLE' };
         const nextMode: CourseType = this.currentCourseType === 'SURF' ? 'SURF' : DEFAULT_COURSE_TYPE;
+        saveMenuPreferences({ trackId });
         await this.handleCatalogTrackSelected(entry, null, nextMode);
         if (!this.stateMachine.is(GameState.READY)) return { ok: false, detail: 'SIGNAL LOAD FAILED // RETRY' };
         this.stateMachine.transitionTo(GameState.COUNTDOWN);
@@ -1568,13 +1569,20 @@ export class Game {
   private selectMap(key: string): void {
     if (!this.stateMachine.is(GameState.READY) || !this.currentAnalysis || !this.currentTrack) return;
     this.selectedMapKey = key;
-    const events = this.world.songDirector.spectaclePlanner.events;
+    saveMenuPreferences({ mapKey: key });
+    const events =this.world.songDirector.spectaclePlanner.events;
     this.world.loadTrack(this.currentAnalysis, this.currentTrack, this.environment, this.currentOfficialTrackId, key);
     this.world.songDirector.spectaclePlanner.events = events;
     this.world.songDirector.onSectionAnnouncement = (title) => {
       this.ui.hud.showSectionTitle(title);
     };
     this.syncMapPicker();
+  }
+
+  /** The map the player last picked (kept for every next game), if it still exists. */
+  private savedMapKey(): string | null {
+    const key = readMenuPreferences().mapKey;
+    return ENVIRONMENT_MAPS.some((m) => m.key === key) ? key : null;
   }
 
   /** Reflects the map the world actually built in the picker. */
@@ -2739,7 +2747,7 @@ export class Game {
     this.currentAnalysis = null;
     this.currentTrack = null;
     this.currentOfficialTrackId = null;
-    this.selectedMapKey = null;
+    this.selectedMapKey = this.savedMapKey();
     // Leaving the world clears any Armory preview override so a stale ephemeral
     // skin can never outlive the screen that set it, and releases any equipped
     // ARTIFACT video so an offscreen menu never keeps decoding it.
@@ -4336,7 +4344,7 @@ export class Game {
   }
 
   private returnToRaceLobby(): void {
-    this.selectedMapKey = null;
+    this.selectedMapKey = this.savedMapKey();
     raceRoomService.clearMapVotes();
     this.droppedRacers.clear();
     this.soloWinNoticeShown = false;
@@ -4874,7 +4882,7 @@ export class Game {
   private async leaveRaceRoom(): Promise<void> {
     clearRaceSession();
     this.droppedRacers.clear();
-    this.selectedMapKey = null;
+    this.selectedMapKey = this.savedMapKey();
     this.ui.importScreen.racePanel.setTrackPickLocked(false);
     this.raceLoadGeneration++;
     this.raceActive = false;

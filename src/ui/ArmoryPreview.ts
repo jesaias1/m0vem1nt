@@ -913,6 +913,7 @@ export class ArmoryPreview {
     this.skinSystem.dispose();
     this.gloveCache.clear();
     this.renderer?.dispose();
+    this.renderer?.forceContextLoss();
     this.renderer = null;
     this.root.remove();
   }

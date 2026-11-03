@@ -10,6 +10,7 @@ import { raceRoomService } from './online/RaceRoomService';
 import { authService } from './online/AuthService';
 import { cloudProgression } from './online/CloudProgression';
 
+import { playIntroIfFirstVisit } from './ui/IntroSplash';
 import { PresetGenerator } from './audio/PresetGenerator';
 
 initializeDesktopTheme();
@@ -22,6 +23,8 @@ function init() {
     console.error('Fatal: Missing root DOM mount elements');
     return;
   }
+
+  playIntroIfFirstVisit();
 
   // Instantiate PLAYHEAD
   const game = new Game(canvasContainer, uiRoot);

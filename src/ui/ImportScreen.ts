@@ -1586,6 +1586,9 @@ export class ImportScreen {
     this.armorySlot = prefs.slot; this.armoryGloveFamily = prefs.family;
     this.armoryOwnership = prefs.ownership; this.armorySort = prefs.sort;
     this.setCourseType(prefs.mode === 'SURF' ? 'SURF' : DEFAULT_COURSE_TYPE);
+    // A signal chosen elsewhere (Next Signal, a leaderboard) is the one selected here.
+    const remembered = this.catalog.find((t) => t.id === prefs.trackId);
+    if (remembered && remembered.id !== this.selectedTrack.id) this.selectTrack(remembered);
     this.renderArmory();
     this.element.classList.remove('hidden');
     if (!this.armoryPanel.classList.contains('hidden')) this.armoryPreview.show();
