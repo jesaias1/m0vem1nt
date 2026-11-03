@@ -10,7 +10,7 @@ import { raceRoomService } from './online/RaceRoomService';
 import { authService } from './online/AuthService';
 import { cloudProgression } from './online/CloudProgression';
 
-import { playIntroIfFirstVisit } from './ui/IntroSplash';
+import { playIntro } from './ui/IntroSplash';
 import { PresetGenerator } from './audio/PresetGenerator';
 
 initializeDesktopTheme();
@@ -24,7 +24,7 @@ function init() {
     return;
   }
 
-  playIntroIfFirstVisit();
+  playIntro();
 
   // Instantiate PLAYHEAD
   const game = new Game(canvasContainer, uiRoot);

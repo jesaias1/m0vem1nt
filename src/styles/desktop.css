@@ -720,3 +720,11 @@ html, body { background: var(--desktop); font-family: var(--font-sans); -webkit-
     .armory-modal-container, .armory-modal-console, .movement-lab-song-container, .decode-container,
     .decode-modal-dialog, .import-container.terminal-console) { zoom: 2; }
 }
+
+/* Online page tidy-up: a normal one-line song picker, calmer spacing, readable small text. */
+#ui-root .race-card-signal .race-track-select { height: 36px; min-height: 0; max-height: 36px; padding: 4px 10px; font: 14px/1.2 var(--font-sans); }
+#ui-root .race-card { gap: 10px; padding: 14px; }
+#ui-root .race-card-signal > * + .race-section-label, #ui-root .race-card-signal label { margin-top: 4px; }
+#ui-root .race-landing-tagline, #ui-root .race-landing-hint, #ui-root .race-friend-box .race-option-desc, #ui-root .race-lobby-guide { font-size: 14px; line-height: 1.45; text-transform: none; }
+#ui-root .race-quick-main .race-find-status, #ui-root .race-mode-btn small { font-size: 14px; text-transform: none; }
+#ui-root .race-landing-hint { padding: 10px 12px; }
