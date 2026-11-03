@@ -1,9 +1,14 @@
 <h1 align="center">m0vem1nt</h1>
-<p align="center"><b>Playhead: turn any song into a place, then run through it.</b></p>
+<p align="center"><b>Surf and strafe to your own music. Free in the browser.</b></p>
 
 <p align="center">
-  <a href="https://playhead-sooty.vercel.app"><b>Play it in the browser</b></a> &nbsp;|&nbsp;
-  <a href="https://www.jesaias.dk/play/playhead">Project page</a>
+  <a href="https://www.jesaias.dk/projects/movemint"><img src="docs/readme/trailer.webp" alt="m0vem1nt trailer: a gloved hand swings a karambit over a surf ramp under an aurora, next to the m0vem1nt logo. Click to watch." width="820"></a>
+</p>
+
+<p align="center">
+  <a href="https://www.movemint.pro"><b>Play at movemint.pro</b></a> &nbsp;|&nbsp;
+  <a href="https://www.jesaias.dk/projects/movemint">Watch the trailer</a> &nbsp;|&nbsp;
+  <a href="https://github.com/jesaias1/m0vem1nt/releases/tag/trailer-v1">Download the trailer (1080p60)</a>
 </p>
 
 <p align="center">
