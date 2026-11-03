@@ -334,6 +334,24 @@ export class OrbitalStationInstance implements EnvironmentThemeInstance {
         light.y += 7;
         addGlow(light, 11, AMBER, 1.0, GLOW_NAV);
       }
+      // A gantry must read as floating in space, not standing on a floor that is not
+      // there: the feet are tied together by a lower beam (a closed frame) when the
+      // corridor allows, and each foot ends in a capped node with a thruster glow.
+      const footY = at.position.y - 48;
+      const footA = at.position.clone().addScaledVector(at.right, feet[0].lateral);
+      const footB = at.position.clone().addScaledVector(at.right, feet[1].lateral);
+      footA.y = footY;
+      footB.y = footY;
+      beamBetween(footA, footB, 8, !!opts.conduit);
+      for (const foot of [footA, footB]) {
+        const cap = foot.clone();
+        cap.y -= 6;
+        const capMatrix = new THREE.Matrix4().compose(cap, orient(at.forward, at.right), new THREE.Vector3(13, 9, 13));
+        if (fits(boxes.box, capMatrix)) boxes.add(capMatrix, [KIND_MODULE, 2.0, 0, 0], rng(), NO_LAMP);
+        const thruster = cap.clone();
+        thruster.y -= 9;
+        addGlow(thruster, 8, COLD, 0.55, GLOW_NAV);
+      }
       if (opts.flood) {
         const mid = tops[0].clone().add(tops[1]).multiplyScalar(0.5);
         mid.y -= 8;
