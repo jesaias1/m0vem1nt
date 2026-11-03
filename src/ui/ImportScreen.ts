@@ -330,11 +330,11 @@ export class ImportScreen {
         <div class="desktop-menubar" aria-hidden="true"><span><img class="brand-logo-text" src="/assets/brand/m0vem1nt_logo_text.png" alt="m0vem1nt" /></span><span>Music &amp; movement</span><span>14 built-in tracks · Bring your own audio</span></div>
 
         <div class="import-tabs terminal-tabs" role="tablist" aria-label="m0vem1nt system modules">
-          <button class="import-tab-btn active" id="tab-btn-showcase" type="button" role="tab" aria-selected="true" aria-controls="panel-showcase">Signal Pack</button>
+          <button class="import-tab-btn active" id="tab-btn-showcase" type="button" title="PICK A SONG AND PLAY ITS COURSE" role="tab" aria-selected="true" aria-controls="panel-showcase">Signal Pack</button>
           <button class="import-tab-btn" id="tab-btn-online" type="button" role="tab" aria-selected="false" aria-controls="panel-online" tabindex="-1" title="RACE WITH FRIENDS + WORLD LEADERBOARD">Online</button>
-          <button class="import-tab-btn" id="tab-btn-custom" type="button" role="tab" aria-selected="false" aria-controls="panel-custom" tabindex="-1">Custom Audio</button>
-          <button class="import-tab-btn" id="tab-btn-lab" type="button" role="tab" aria-selected="false" aria-controls="panel-lab" tabindex="-1">Movement Lab</button>
-          <button class="import-tab-btn" id="tab-btn-armory" type="button" role="tab" aria-selected="false" aria-controls="panel-armory" tabindex="-1">Armory</button>
+          <button class="import-tab-btn" id="tab-btn-custom" type="button" title="PLAY ON YOUR OWN MUSIC FILE" role="tab" aria-selected="false" aria-controls="panel-custom" tabindex="-1">Custom Audio</button>
+          <button class="import-tab-btn" id="tab-btn-lab" type="button" title="PRACTICE MOVEMENT, NO SCORE" role="tab" aria-selected="false" aria-controls="panel-lab" tabindex="-1">Movement Lab</button>
+          <button class="import-tab-btn" id="tab-btn-armory" type="button" title="KNIVES, GLOVES AND SIGNAL DROPS" role="tab" aria-selected="false" aria-controls="panel-armory" tabindex="-1">Armory</button>
         </div>
 
         <!-- 01: THE SIGNAL PACK PANEL: hero deck (selected signal) + catalog list. -->
