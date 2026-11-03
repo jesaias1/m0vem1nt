@@ -6,6 +6,7 @@
  * and Karambit Armory & Cosmic Skins Profile.
  */
 
+import { myTracksStore } from '../audio/MyTracksStore';
 import { readMenuPreferences, saveMenuPreferences, matchesTrackFilter, type TrackFilter } from './MenuPreferences';
 import { mountLoadouts } from './LoadoutPresets';
 import { AudioLoader } from '../audio/AudioLoader';
@@ -420,6 +421,10 @@ export class ImportScreen {
                 <!-- Populated dynamically via buildStrip() -->
               </div>
               <div class="showcase-mastery-strip" id="showcase-mastery-strip"></div>
+              <section class="my-tracks" aria-label="My tracks">
+                <div class="terminal-panel-header catalog-header"><span>MY TRACKS // THIS PC ONLY</span><span class="catalog-count" id="my-tracks-count"></span></div>
+                <div class="my-tracks-list" id="my-tracks-list"></div>
+              </section>
             </aside>
           </div>
         </div>
@@ -439,6 +444,11 @@ export class ImportScreen {
             <button type="button" class="course-type-btn active" id="btn-course-surf" role="radio" aria-checked="true" data-course-type="SURF">SURF<span>FLOW / TRANSFERS / VERTICALITY</span></button>
             <button type="button" class="course-type-btn" id="btn-course-playhead" role="radio" aria-checked="false" data-course-type="PLAYHEAD">PLATFORMS<span>MIXED MOVEMENT</span></button>
           </div>
+
+          <label class="custom-keep" for="custom-keep-box">
+            <input type="checkbox" id="custom-keep-box" />
+            <span>ADD TO SIGNAL PACK<small>keeps a copy under MY TRACKS in the Signal Pack tab. Stored on this PC only, never uploaded.</small></span>
+          </label>
 
           <div class="custom-actions">          <style>
             .custom-course-type { display: flex; align-items: center; gap: 8px; margin: 10px 0 4px; flex-wrap: wrap; }
@@ -1817,8 +1827,7 @@ export class ImportScreen {
     AudioLoader.setupDropZone(
       this.dropZone,
       (file) => {
-        this.stopPreview();
-        this.onFileSelectedCallback?.(file, this.selectedCourseType);
+        this.submitCustomFile(file);
       },
       (err) => this.onErrorCallback?.(err)
     );
@@ -1848,10 +1857,68 @@ export class ImportScreen {
     this.fileInput.addEventListener('change', () => {
       if (this.fileInput.files && this.fileInput.files.length > 0) {
         const file = this.fileInput.files[0];
-        this.stopPreview();
-        this.onFileSelectedCallback?.(file, this.selectedCourseType);
+        this.submitCustomFile(file);
       }
     });
+    void this.refreshMyTracks();
+  }
+
+  /** Plays a freshly chosen file; keeps a copy first when "Add to Signal Pack" is ticked. */
+  private submitCustomFile(file: File): void {
+    this.stopPreview();
+    const keep = this.element.querySelector<HTMLInputElement>('#custom-keep-box');
+    if (keep?.checked) {
+      void myTracksStore.add(file).then((result) => {
+        if (!result.ok) this.setCustomStatus(result.reason, 'error');
+        void this.refreshMyTracks();
+      });
+    }
+    this.onFileSelectedCallback?.(file, this.selectedCourseType);
+  }
+
+  /** Rebuilds the MY TRACKS list at the bottom of the Signal Pack tab. */
+  private async refreshMyTracks(): Promise<void> {
+    const list = this.element.querySelector<HTMLElement>('#my-tracks-list');
+    const count = this.element.querySelector<HTMLElement>('#my-tracks-count');
+    if (!list) return;
+    const tracks = await myTracksStore.list();
+    if (count) count.textContent = tracks.length ? String(tracks.length) : '';
+    list.replaceChildren();
+    if (tracks.length === 0) {
+      const hint = document.createElement('div');
+      hint.className = 'my-tracks-empty';
+      hint.textContent = 'Nothing here yet. Tick "Add to Signal Pack" when you import a song in Custom Audio and it appears here, on this PC only.';
+      list.appendChild(hint);
+      return;
+    }
+    for (const track of tracks) {
+      const row = document.createElement('div');
+      row.className = 'my-track-row';
+      const name = document.createElement('span');
+      name.className = 'my-track-name';
+      name.textContent = track.name.replace(/.[^.]+$/, '');
+      name.title = track.name;
+      const play = document.createElement('button');
+      play.type = 'button';
+      play.className = 'my-track-play';
+      play.textContent = '> PLAY';
+      play.addEventListener('click', () => {
+        void myTracksStore.getFile(track.id).then((file) => {
+          if (!file) return void this.refreshMyTracks();
+          this.stopPreview();
+          this.onFileSelectedCallback?.(file, this.selectedCourseType);
+        });
+      });
+      const del = document.createElement('button');
+      del.type = 'button';
+      del.className = 'my-track-del';
+      del.textContent = 'X';
+      del.title = 'Remove from My Tracks';
+      del.setAttribute('aria-label', `Remove ${track.name} from My Tracks`);
+      del.addEventListener('click', () => void myTracksStore.remove(track.id).then(() => this.refreshMyTracks()));
+      row.append(name, play, del);
+      list.appendChild(row);
+    }
   }
 
   private switchModule(activeIndex: number): void {

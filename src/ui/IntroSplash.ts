@@ -1,7 +1,7 @@
 /**
  * OPENING INTRO: a retro desktop opens a window around the m0vem1nt logo and
- * "starts" the game. Played once each time the site is loaded (never when
- * returning to the menu from a run); any key or click skips it. Purely cosmetic: the
+ * "starts" the game. Played once per browser tab/session (never when returning
+ * to the menu from a run, nor on a refresh in the same tab); any key or click skips it. Purely cosmetic: the
  * game boots underneath while it plays.
  */
 
@@ -37,7 +37,28 @@ const STEPS: Array<[number, string]> = [
 ];
 const TOTAL_MS = 3800;
 
+const SESSION_KEY = 'm0vem1nt.intro.session';
+
+/** True once per browser tab/session: a refresh in the same tab does not replay it. */
+export function shouldPlayIntro(storage: Pick<Storage, 'getItem' | 'setItem'> | null): boolean {
+  if (!storage) return true;
+  try {
+    if (storage.getItem(SESSION_KEY)) return false;
+    storage.setItem(SESSION_KEY, '1');
+  } catch {
+    /* storage blocked: just play it */
+  }
+  return true;
+}
+
 export function playIntro(): void {
+  let storage: Storage | null = null;
+  try {
+    storage = window.sessionStorage;
+  } catch {
+    storage = null;
+  }
+  if (!shouldPlayIntro(storage)) return;
 
   const style = document.createElement('style');
   style.id = STYLE_ID;
