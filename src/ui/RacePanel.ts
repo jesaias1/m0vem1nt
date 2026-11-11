@@ -143,10 +143,10 @@ export class RacePanel {
             <select class="online-select race-track-select" id="race-track-select" aria-label="Selected signal"></select>
             <span class="race-field-label" id="race-mode-label">COURSE</span>
             <div class="race-mode-seg" id="race-mode-seg" role="group" aria-labelledby="race-mode-label">
-              <button type="button" class="race-mode-btn active" data-mode="SURF">SURF<small>flow &amp; ramps</small></button>
-              <button type="button" class="race-mode-btn" data-mode="NORMAL">PLATFORMS<small>mixed movement</small></button>
+              <button type="button" class="race-mode-btn active" data-mode="NORMAL">PLATFORMS<small>mixed movement</small></button>
+              <button type="button" class="race-mode-btn" data-mode="SURF">SURF<small>flow &amp; ramps</small></button>
             </div>
-            <select id="race-mode" class="race-capacity-native" aria-label="Race mode" tabindex="-1"><option value="SURF">Surf</option><option value="NORMAL">Platforms</option></select>
+            <select id="race-mode" class="race-capacity-native" aria-label="Race mode" tabindex="-1"><option value="NORMAL">Platforms</option><option value="SURF">Surf</option></select>
           </section>
 
           <section class="race-card race-card-play" aria-label="Play">

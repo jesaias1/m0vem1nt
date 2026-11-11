@@ -7,21 +7,21 @@ export interface MenuPreferences {
   ownership: 'all' | 'owned' | 'locked'; family: 'all' | 'drop' | 'mastery'; sort: 'rarity' | 'name';
 }
 const KEY = 'playhead.menu.v1';
-const defaults: MenuPreferences = { trackId: '', mode: 'SURF', raceTrackId: '', raceMode: 'SURF', mapKey: '', slot: 'karambit', ownership: 'all', family: 'all', sort: 'rarity' };
+const defaults: MenuPreferences = { trackId: '', mode: 'NORMAL', raceTrackId: '', raceMode: 'NORMAL', mapKey: '', slot: 'karambit', ownership: 'all', family: 'all', sort: 'rarity' };
 export function readMenuPreferences(): MenuPreferences {
   let raw: Record<string, unknown> = {};
   try { const value = JSON.parse(localStorage.getItem(KEY) ?? '{}'); if (value && typeof value === 'object' && !Array.isArray(value)) raw = value; } catch { /* Defaults remain usable offline/private. */ }
   const pick = <T extends string>(key: string, choices: readonly T[], fallback: T): T => choices.includes(raw[key] as T) ? raw[key] as T : fallback;
   return { mapKey: typeof raw.mapKey === 'string' ? raw.mapKey.slice(0, 60) : '', trackId: typeof raw.trackId === 'string' ? raw.trackId.slice(0, 120) : '',
     raceTrackId: typeof raw.raceTrackId === 'string' ? raw.raceTrackId.slice(0, 120) : '',
-    raceMode: pick('raceMode', ['NORMAL', 'SURF'], defaults.raceMode),
-    // Surf became the main mode: menus saved before that default to it once.
-    mode: raw.modeVersion === 2 ? pick('mode', ['NORMAL', 'SURF'], defaults.mode) : 'SURF', slot: pick('slot', ['karambit', 'gloves'], defaults.slot),
+    raceMode: raw.modeVersion === 3 ? pick('raceMode', ['NORMAL', 'SURF'], defaults.raceMode) : 'NORMAL',
+    // Platforms is the main mode again: menus saved before that default to it once.
+    mode: raw.modeVersion === 3 ? pick('mode', ['NORMAL', 'SURF'], defaults.mode) : 'NORMAL', slot: pick('slot', ['karambit', 'gloves'], defaults.slot),
     ownership: pick('ownership', ['all', 'owned', 'locked'], defaults.ownership),
     family: pick('family', ['all', 'drop', 'mastery'], defaults.family), sort: pick('sort', ['rarity', 'name'], defaults.sort) };
 }
 export function saveMenuPreferences(patch: Partial<MenuPreferences>): void {
-  try { localStorage.setItem(KEY, JSON.stringify({ ...readMenuPreferences(), ...patch, modeVersion: 2 })); } catch { /* Session remains functional. */ }
+  try { localStorage.setItem(KEY, JSON.stringify({ ...readMenuPreferences(), ...patch, modeVersion: 3 })); } catch { /* Session remains functional. */ }
 }
 export interface TrackFilter { search: string; difficulty: string; duration: string }
 export function matchesTrackFilter(track: {title: string; artist?: string; genre?: string; difficulty: number; duration: number}, filter: TrackFilter): boolean {

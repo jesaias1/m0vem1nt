@@ -1582,7 +1582,8 @@ export class Game {
   /** The map the player last picked (kept for every next game), if it still exists. */
   private savedMapKey(): string | null {
     const key = readMenuPreferences().mapKey;
-    return ENVIRONMENT_MAPS.some((m) => m.key === key) ? key : null;
+    // Orbital Station is the default map until the player picks another one.
+    return ENVIRONMENT_MAPS.some((m) => m.key === key) ? key : 'ORBITAL_STATION';
   }
 
   /** Reflects the map the world actually built in the picker. */

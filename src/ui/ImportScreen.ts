@@ -390,8 +390,8 @@ export class ImportScreen {
 
               <div class="custom-course-type showcase-course-type" id="showcase-course-type" role="radiogroup" aria-label="Game mode">
                 <span class="course-type-label">MODE</span>
-                <button type="button" class="course-type-btn active" id="btn-showcase-mode-surf" role="radio" aria-checked="true" data-course-type="SURF">SURF<span>BASE MODE · FLOW / TRANSFERS</span></button>
-                <button type="button" class="course-type-btn" id="btn-showcase-mode-playhead" role="radio" aria-checked="false" data-course-type="PLAYHEAD">PLATFORMS<span>EXTRA MODE · MIXED MOVEMENT</span></button>
+                <button type="button" class="course-type-btn active" id="btn-showcase-mode-playhead" role="radio" aria-checked="true" data-course-type="PLAYHEAD">PLATFORMS<span>MAIN MODE · MIXED MOVEMENT</span></button>
+                <button type="button" class="course-type-btn" id="btn-showcase-mode-surf" role="radio" aria-checked="false" data-course-type="SURF">SURF<span>EXTRA MODE · FLOW / TRANSFERS</span></button>
               </div>
 
               <div class="showcase-actions">
@@ -442,8 +442,8 @@ export class ImportScreen {
 
           <div class="custom-course-type" id="custom-course-type" role="radiogroup" aria-label="Course type">
             <span class="course-type-label">COURSE TYPE</span>
-            <button type="button" class="course-type-btn active" id="btn-course-surf" role="radio" aria-checked="true" data-course-type="SURF">SURF<span>FLOW / TRANSFERS / VERTICALITY</span></button>
-            <button type="button" class="course-type-btn" id="btn-course-playhead" role="radio" aria-checked="false" data-course-type="PLAYHEAD">PLATFORMS<span>MIXED MOVEMENT</span></button>
+            <button type="button" class="course-type-btn active" id="btn-course-playhead" role="radio" aria-checked="true" data-course-type="PLAYHEAD">PLATFORMS<span>MIXED MOVEMENT</span></button>
+            <button type="button" class="course-type-btn" id="btn-course-surf" role="radio" aria-checked="false" data-course-type="SURF">SURF<span>FLOW / TRANSFERS / VERTICALITY</span></button>
           </div>
 
           <label class="custom-keep" for="custom-keep-box">
